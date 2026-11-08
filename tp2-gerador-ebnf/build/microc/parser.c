@@ -25,6 +25,40 @@ const char *nome_token(int tipo)
 {
     switch (tipo) {
     case END_OF_FILE: return "fim de arquivo";
+    case INT: return "'int'";
+    case MAIN: return "'main'";
+    case LPAREN: return "'('";
+    case RPAREN: return "')'";
+    case LBRACE: return "'{'";
+    case RBRACE: return "'}'";
+    case ID: return "ID";
+    case LBRACKET: return "'['";
+    case INTEGERCONST: return "INTEGERCONST";
+    case RBRACKET: return "']'";
+    case SEMICOLON: return "';'";
+    case CHAR: return "'char'";
+    case IF: return "'if'";
+    case ELSE: return "'else'";
+    case FOR: return "'for'";
+    case RETURN: return "'return'";
+    case PRINT: return "'print'";
+    case ASSIGN: return "'='";
+    case STRINGCONST: return "STRINGCONST";
+    case AND: return "'&&'";
+    case OR: return "'||'";
+    case EQ: return "'=='";
+    case NEQ: return "'!='";
+    case LT: return "'<'";
+    case GT: return "'>'";
+    case LEQ: return "'<='";
+    case GEQ: return "'>='";
+    case PLUS: return "'+'";
+    case MINUS: return "'-'";
+    case MUL: return "'*'";
+    case DIV: return "'/'";
+    case MOD: return "'%'";
+    case CHARCONST: return "CHARCONST";
+    case NOT: return "'!'";
     default: return "token desconhecido";
     }
 }
@@ -128,7 +162,7 @@ static Token token_de_arquivo(void)
 
 /* ---- procedimentos (um por nao terminal) ---- */
 
-/* programa =  ; */
+/* programa = 'int' 'main' '(' ')' bloco ; */
 void parse_programa(void)
 {
     arvore_entra("programa");
@@ -136,7 +170,7 @@ void parse_programa(void)
     arvore_sai();
 }
 
-/* bloco =  ; */
+/* bloco = '{' { declaracao } { comando } '}' ; */
 void parse_bloco(void)
 {
     arvore_entra("bloco");
@@ -144,7 +178,7 @@ void parse_bloco(void)
     arvore_sai();
 }
 
-/* declaracao =  ; */
+/* declaracao = tipo ID [ '[' INTEGERCONST ']' ] ';' ; */
 void parse_declaracao(void)
 {
     arvore_entra("declaracao");
@@ -152,15 +186,7 @@ void parse_declaracao(void)
     arvore_sai();
 }
 
-/* tipo =  ; */
-void parse_tipo(void)
-{
-    arvore_entra("tipo");
-    /* TODO(aluno): construcao ainda nao traduzida */
-    arvore_sai();
-}
-
-/* comando =  ; */
+/* comando = comando_if | comando_for | atribuicao | comando_return | comando_print | bloco | ';' ; */
 void parse_comando(void)
 {
     arvore_entra("comando");
@@ -168,7 +194,15 @@ void parse_comando(void)
     arvore_sai();
 }
 
-/* comando_if =  ; */
+/* tipo = 'int' | 'char' ; */
+void parse_tipo(void)
+{
+    arvore_entra("tipo");
+    /* TODO(aluno): construcao ainda nao traduzida */
+    arvore_sai();
+}
+
+/* comando_if = 'if' '(' expressao ')' comando [ 'else' comando ] ; */
 void parse_comando_if(void)
 {
     arvore_entra("comando_if");
@@ -176,7 +210,7 @@ void parse_comando_if(void)
     arvore_sai();
 }
 
-/* comando_for =  ; */
+/* comando_for = 'for' '(' atribuicao_interna ';' expressao ';' atribuicao_interna ')' comando ; */
 void parse_comando_for(void)
 {
     arvore_entra("comando_for");
@@ -184,23 +218,7 @@ void parse_comando_for(void)
     arvore_sai();
 }
 
-/* comando_return =  ; */
-void parse_comando_return(void)
-{
-    arvore_entra("comando_return");
-    /* TODO(aluno): construcao ainda nao traduzida */
-    arvore_sai();
-}
-
-/* comando_print =  ; */
-void parse_comando_print(void)
-{
-    arvore_entra("comando_print");
-    /* TODO(aluno): construcao ainda nao traduzida */
-    arvore_sai();
-}
-
-/* atribuicao =  ; */
+/* atribuicao = atribuicao_interna ';' ; */
 void parse_atribuicao(void)
 {
     arvore_entra("atribuicao");
@@ -208,7 +226,31 @@ void parse_atribuicao(void)
     arvore_sai();
 }
 
-/* atribuicao_interna =  ; */
+/* comando_return = 'return' [ expressao ] ';' ; */
+void parse_comando_return(void)
+{
+    arvore_entra("comando_return");
+    /* TODO(aluno): construcao ainda nao traduzida */
+    arvore_sai();
+}
+
+/* comando_print = 'print' '(' conteudo_print ')' ';' ; */
+void parse_comando_print(void)
+{
+    arvore_entra("comando_print");
+    /* TODO(aluno): construcao ainda nao traduzida */
+    arvore_sai();
+}
+
+/* expressao = expressao_logica ; */
+void parse_expressao(void)
+{
+    arvore_entra("expressao");
+    parse_expressao_logica();
+    arvore_sai();
+}
+
+/* atribuicao_interna = ID [ '[' expressao ']' ] '=' expressao ; */
 void parse_atribuicao_interna(void)
 {
     arvore_entra("atribuicao_interna");
@@ -216,7 +258,7 @@ void parse_atribuicao_interna(void)
     arvore_sai();
 }
 
-/* conteudo_print =  ; */
+/* conteudo_print = STRINGCONST | expressao ; */
 void parse_conteudo_print(void)
 {
     arvore_entra("conteudo_print");
@@ -224,15 +266,7 @@ void parse_conteudo_print(void)
     arvore_sai();
 }
 
-/* expressao =  ; */
-void parse_expressao(void)
-{
-    arvore_entra("expressao");
-    /* TODO(aluno): construcao ainda nao traduzida */
-    arvore_sai();
-}
-
-/* expressao_logica =  ; */
+/* expressao_logica = expressao_relacional { ( '&&' | '||' ) expressao_relacional } ; */
 void parse_expressao_logica(void)
 {
     arvore_entra("expressao_logica");
@@ -240,7 +274,7 @@ void parse_expressao_logica(void)
     arvore_sai();
 }
 
-/* expressao_relacional =  ; */
+/* expressao_relacional = expressao_aritmetica [ operador_relacional expressao_aritmetica ] ; */
 void parse_expressao_relacional(void)
 {
     arvore_entra("expressao_relacional");
@@ -248,15 +282,7 @@ void parse_expressao_relacional(void)
     arvore_sai();
 }
 
-/* operador_relacional =  ; */
-void parse_operador_relacional(void)
-{
-    arvore_entra("operador_relacional");
-    /* TODO(aluno): construcao ainda nao traduzida */
-    arvore_sai();
-}
-
-/* expressao_aritmetica =  ; */
+/* expressao_aritmetica = termo { ( '+' | '-' ) termo } ; */
 void parse_expressao_aritmetica(void)
 {
     arvore_entra("expressao_aritmetica");
@@ -264,7 +290,15 @@ void parse_expressao_aritmetica(void)
     arvore_sai();
 }
 
-/* termo =  ; */
+/* operador_relacional = '==' | '!=' | '<' | '>' | '<=' | '>=' ; */
+void parse_operador_relacional(void)
+{
+    arvore_entra("operador_relacional");
+    /* TODO(aluno): construcao ainda nao traduzida */
+    arvore_sai();
+}
+
+/* termo = fator { ( '*' | '/' | '%' ) fator } ; */
 void parse_termo(void)
 {
     arvore_entra("termo");
@@ -272,7 +306,7 @@ void parse_termo(void)
     arvore_sai();
 }
 
-/* fator =  ; */
+/* fator = '(' expressao ')' | ID [ '[' expressao ']' ] | INTEGERCONST | CHARCONST | '!' fator ; */
 void parse_fator(void)
 {
     arvore_entra("fator");
