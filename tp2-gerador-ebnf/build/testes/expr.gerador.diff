@@ -1,0 +1,17 @@
+--- testes/esperado/expr.gerador	2026-11-07 13:40:04.794018800 -0400
++++ build/testes/expr.gerador	2026-11-07 23:10:28.892175400 -0400
+@@ -1,8 +1,8 @@
+ NAO TERMINAL  ANULAVEL  FIRST / FOLLOW
+-expr          nao       FIRST  = {NUM, ID, '('}
+-                        FOLLOW = {$, ')'}
+-term          nao       FIRST  = {NUM, ID, '('}
+-                        FOLLOW = {$, '+', '-', ')'}
+-factor        nao       FIRST  = {NUM, ID, '('}
+-                        FOLLOW = {$, '+', '-', '*', '/', ')'}
++expr          nao       FIRST  = {}
++                        FOLLOW = {}
++term          nao       FIRST  = {}
++                        FOLLOW = {}
++factor        nao       FIRST  = {}
++                        FOLLOW = {}
+ status 0

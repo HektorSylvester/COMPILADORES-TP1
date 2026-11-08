@@ -1,0 +1,8 @@
+--- testes/esperado/recursao_esquerda.gerador	2026-11-07 13:40:04.801718500 -0400
++++ build/testes/recursao_esquerda.gerador	2026-11-07 23:10:29.031698400 -0400
+@@ -1,5 +1,3 @@
+ testes/gramaticas/recursao_esquerda.ebnf:10: erro: nao terminal expr tem recursao a esquerda direta
+-testes/gramaticas/recursao_esquerda.ebnf:12: erro: nao terminal lista tem recursao a esquerda indireta
+ testes/gramaticas/recursao_esquerda.ebnf:11: erro: nao terminal term tem recursao a esquerda direta
+-testes/gramaticas/recursao_esquerda.ebnf:13: erro: nao terminal item tem recursao a esquerda indireta
+ status 1

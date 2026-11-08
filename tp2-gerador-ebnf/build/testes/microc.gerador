@@ -1,0 +1,41 @@
+testes/gramaticas/microc.ebnf: aviso: microc_carregar_tokens_h ainda nao implementado: nomes de testes/gramaticas/../../microc/tokens.h nao verificados
+NAO TERMINAL          ANULAVEL  FIRST / FOLLOW
+programa              nao       FIRST  = {}
+                                FOLLOW = {}
+bloco                 nao       FIRST  = {}
+                                FOLLOW = {}
+declaracao            nao       FIRST  = {}
+                                FOLLOW = {}
+comando               nao       FIRST  = {}
+                                FOLLOW = {}
+tipo                  nao       FIRST  = {}
+                                FOLLOW = {}
+comando_if            nao       FIRST  = {}
+                                FOLLOW = {}
+comando_for           nao       FIRST  = {}
+                                FOLLOW = {}
+atribuicao            nao       FIRST  = {}
+                                FOLLOW = {}
+comando_return        nao       FIRST  = {}
+                                FOLLOW = {}
+comando_print         nao       FIRST  = {}
+                                FOLLOW = {}
+expressao             nao       FIRST  = {}
+                                FOLLOW = {}
+atribuicao_interna    nao       FIRST  = {}
+                                FOLLOW = {}
+conteudo_print        nao       FIRST  = {}
+                                FOLLOW = {}
+expressao_logica      nao       FIRST  = {}
+                                FOLLOW = {}
+expressao_relacional  nao       FIRST  = {}
+                                FOLLOW = {}
+expressao_aritmetica  nao       FIRST  = {}
+                                FOLLOW = {}
+operador_relacional   nao       FIRST  = {}
+                                FOLLOW = {}
+termo                 nao       FIRST  = {}
+                                FOLLOW = {}
+fator                 nao       FIRST  = {}
+                                FOLLOW = {}
+status 0

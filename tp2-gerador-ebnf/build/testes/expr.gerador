@@ -1,0 +1,8 @@
+NAO TERMINAL  ANULAVEL  FIRST / FOLLOW
+expr          nao       FIRST  = {}
+                        FOLLOW = {}
+term          nao       FIRST  = {}
+                        FOLLOW = {}
+factor        nao       FIRST  = {}
+                        FOLLOW = {}
+status 0

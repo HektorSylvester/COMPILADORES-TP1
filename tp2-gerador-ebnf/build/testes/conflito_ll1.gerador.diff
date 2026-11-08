@@ -1,0 +1,16 @@
+--- testes/esperado/conflito_ll1.gerador	2026-11-07 13:40:04.804731900 -0400
++++ build/testes/conflito_ll1.gerador	2026-11-07 23:10:28.821924400 -0400
+@@ -1,8 +1,6 @@
+ NAO TERMINAL  ANULAVEL  FIRST / FOLLOW
+-stmt          nao       FIRST  = {ID}
+-                        FOLLOW = {$}
+-expr          nao       FIRST  = {ID, NUM}
+-                        FOLLOW = {';'}
+-testes/gramaticas/conflito_ll1.ebnf:8:10: erro: conflito LL(1) em stmt: alternativas 1 e 2 comecam com {ID}
+-testes/gramaticas/conflito_ll1.ebnf: a gramatica nao e LL(1); nenhum codigo foi gerado
+-status 1
++stmt          nao       FIRST  = {}
++                        FOLLOW = {}
++expr          nao       FIRST  = {}
++                        FOLLOW = {}
++status 0

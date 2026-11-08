@@ -1,0 +1,7 @@
+--- testes/programas/expr/aceito_1.esperado	2026-11-07 13:40:04.748833700 -0400
++++ build/testes/expr-aceito_1.txt.saida	2026-11-07 23:10:29.297418400 -0400
+@@ -1,2 +1,2 @@
+-entrada aceita
+-status 0
++linha 1, coluna 1: erro lexico: caractere invalido '2'
++status 1
