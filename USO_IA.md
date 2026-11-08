@@ -19,3 +19,7 @@ Modelo de entrada:
     Finalidade: eu não sabia o que era o 'ponto fixo' em ' marque o inicial e, ate um ponto fixo'.
     O que fiz: Consultado, o chat me explicou a ideia de circularidade na busca.
 
+    Ferramenta: Gemini (Google)
+    Trecho:     conjuntos.c
+    Finalidade: Compreender a estrutura e utilidade de BitSet para o cálculo de FIRST e FOLLOW.
+    O que fiz:  Consultado, o chat me explicou a representação de conjuntos por mapas de bits (operações bitwise) e como utilizar funções como bitset_unir para gerenciar as iterações de ponto fixo.
