@@ -1,5 +1,5 @@
 --- testes/esperado/microc.gerador	2026-11-07 13:40:04.810783900 -0400
-+++ build/testes/microc.gerador	2026-11-07 23:10:28.967789500 -0400
++++ build/testes/microc.gerador	2026-11-08 13:54:05.555875700 -0400
 @@ -1,41 +1,41 @@
 +testes/gramaticas/microc.ebnf: aviso: microc_carregar_tokens_h ainda nao implementado: nomes de testes/gramaticas/../../microc/tokens.h nao verificados
  NAO TERMINAL          ANULAVEL  FIRST / FOLLOW

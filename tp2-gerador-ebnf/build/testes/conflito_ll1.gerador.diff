@@ -1,5 +1,5 @@
 --- testes/esperado/conflito_ll1.gerador	2026-11-07 13:40:04.804731900 -0400
-+++ build/testes/conflito_ll1.gerador	2026-11-07 23:10:28.821924400 -0400
++++ build/testes/conflito_ll1.gerador	2026-11-08 13:54:05.232241200 -0400
 @@ -1,8 +1,6 @@
  NAO TERMINAL  ANULAVEL  FIRST / FOLLOW
 -stmt          nao       FIRST  = {ID}

@@ -58,19 +58,106 @@ void conj_imprimir(FILE *f, const Gramatica *g)
     }
 }
 
-/* ------------------------------------------------------------------ */
-/* A implementar                                                      */
-/* ------------------------------------------------------------------ */
 
-/* TODO(aluno): calcular e->anulavel para cada no Expr e g->nts[i].anulavel.
+/* DONE(aluno): calcular e->anulavel para cada no Expr e g->nts[i].anulavel.
  *   E_TERM: 0        E_VAZIO: 1        E_NAOTERM: anulavel do nao terminal
  *   E_SEQ: 1 se todos os filhos forem anulaveis
  *   E_ALT: 1 se algum filho for anulavel
  *   E_OPC, E_REP: 1 (calcule tambem o do filho)
  * Repita ate nada mudar. */
+
+static int calcular_expr_anulavel(Expr *e, const Gramatica *g, int *mudou)
+{
+    int i, novo_val, todos_anulaveis, algum_anulavel;
+
+    if (e == NULL)
+        return 0;
+
+    switch (e->tipo) 
+    {
+        case E_TERM:
+            novo_val = 0;
+            break;
+
+        case E_VAZIO:
+            novo_val = 1;
+            break;
+
+        case E_NAOTERM:
+            novo_val = g->nts[e->simbolo].anulavel;
+            break;
+
+        case E_OPC:
+        case E_REP:
+            for (i = 0; i < e->nfilhos; i++)
+                calcular_expr_anulavel(e->filhos[i], g, mudou);
+
+            novo_val = 1;
+            break;
+
+        case E_SEQ:
+        todos_anulaveis = 1;
+        for (i = 0; i < e->nfilhos; i++) 
+        {
+            int filho_anulavel = calcular_expr_anulavel(e->filhos[i], g, mudou);
+            if (filho_anulavel == 0) 
+                todos_anulaveis = 0;
+            
+        }
+        novo_val = todos_anulaveis;
+        break;
+
+        case E_ALT:
+        algum_anulavel = 0;
+        for (i = 0; i < e->nfilhos; i++) 
+        {
+            int filho_anulavel = calcular_expr_anulavel(e->filhos[i], g, mudou);
+
+            if (filho_anulavel == 1) 
+                algum_anulavel = 1;
+            
+        }
+        novo_val = algum_anulavel;
+        break;
+
+        default:
+            novo_val = 0;
+            break;
+    }
+
+    if (e->anulavel != novo_val) 
+    {
+        e->anulavel = novo_val;
+        *mudou = 1;
+    }
+
+    return novo_val;
+}
+
 void conj_anulavel(Gramatica *g)
 {
-    (void) g;
+    int i, mudou, val;
+
+    if (g->nnts == 0)
+        return;
+
+    do {
+        mudou = 0;
+
+        for (i = 0; i < g->nnts; i++) 
+        {
+            if (g->nts[i].regra == NULL)
+                continue;
+
+            val = calcular_expr_anulavel(g->nts[i].regra, g, &mudou);
+
+            if (g->nts[i].anulavel != val) 
+            {
+                g->nts[i].anulavel = val;
+                mudou = 1;
+            }
+        }
+    } while (mudou);
 }
 
 /* TODO(aluno): calcular e->first para cada no Expr e g->nts[i].first.
