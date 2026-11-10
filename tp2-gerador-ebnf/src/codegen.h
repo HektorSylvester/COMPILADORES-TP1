@@ -16,6 +16,8 @@
 typedef struct {
     int microc;            /* --scanner microc */
     int arvore;            /* --tree: gera suporte a impressao da arvore */
+    int ast;               /* --ast: gera suporte a arvore sintatica abstrata */
+    int recuperacao;       /* --recover: continua apos erros sintaticos */
     const char *prefixo;   /* -o: caminho sem extensao */
     const char *origem;    /* nome do arquivo .ebnf (para comentarios) */
 } OpcoesGeracao;

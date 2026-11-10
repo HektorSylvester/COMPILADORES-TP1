@@ -71,3 +71,8 @@ Modelo de entrada:
     Trecho:     animacao/arvore_manim.py, animacao/testes/test_arvore_manim.py e animacao/README.md
     Finalidade: Implementar uma extensão opcional e didática que reconstrói a saída textual de --tree e anima a criação dos nós com Manim Community, exportando GIF e PNG sem alterar o parser em C.
     O que fiz:  Implementação assistida, com revisão do formato da árvore, testes de parsing/CLI e validação da renderização; documentação de instalação e execução incluída.
+
+    Ferramenta: Copilot SDK (VS Code)
+    Trecho:     src/codegen.c, src/ll1.c, src/main.c, testes/gramaticas/ebnf.ebnf
+    Finalidade: Implementar os quatro recursos opcionais de pontuação extra: recuperação de erros, construção de AST, fatoração automática de conflitos LL(1) simples e descrição formal da própria EBNF.
+    O que fiz:  Implementação assistida e validada com compilação ANSI C, parsers gerados, entradas aceitas/rejeitadas e testes específicos para cada opção; o comportamento padrão foi mantido sem as novas opções.

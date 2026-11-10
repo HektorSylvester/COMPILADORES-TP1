@@ -13,14 +13,15 @@ As duas primeiras linhas deste arquivo seguem o formato do TP1: uma linha `aluno
 ```
 make                      # compila o gerador (e o analisador de Micro C, se o TP1 estiver em microc/)
 make test                 # executa os testes de testes/
+make test-extras          # executa os testes dos recursos de pontuação extra
 make microc               # gera e compila build/microc/parser_microc
 make clean
 ```
 
 ```
-./gerador gramatica.ebnf -o saida/parser [--scanner microc] [--sets] [--tree] [--debug]
+./gerador gramatica.ebnf -o saida/parser [--scanner microc] [--sets] [--tree] [--ast] [--recover] [--auto-conflicts] [--debug]
 gcc -ansi -pedantic -Wall -Wextra -o parser saida/parser.c
-./parser [--tree] programa.txt        # ou: ./parser --tokens tokens.txt
+./parser [--tree] [--ast] [--recover] programa.txt  # ou: ./parser --tokens tokens.txt
 ```
 
 Todo o código deve compilar sem avisos com `gcc -ansi -pedantic -Wall -Wextra`. A única exceção é o `lex.yy.c` gerado pelo flex.
@@ -78,3 +79,60 @@ python animacao\arvore_manim.py --parser build\expr.exe --entrada testes\program
 O analisador precisa ter sido gerado com `--tree` e compilado previamente. As
 instruções completas, incluindo o comando direto `manim ... ArvoreDerivacao`,
 estão em `tp2-gerador-ebnf/animacao/README.md`.
+
+## Pontuação extra
+
+Os quatro recursos abaixo são opcionais e não alteram o comportamento padrão
+quando suas opções não são usadas.
+
+### Continuar a análise após erros (+1,0)
+
+Gere o analisador com `--recover`:
+
+```powershell
+.\gerador testes\gramaticas\expr.ebnf -o build\expr_recover --recover
+gcc -ansi -pedantic -Wall -Wextra -o build\expr_recover.exe build\expr_recover.c
+.\build\expr_recover.exe --recover entrada_com_erros.txt
+```
+
+O analisador usa recuperação por descarte de tokens, relata cada erro
+encontrado e termina com código diferente de zero. Erros léxicos do scanner
+próprio também são descartados para que a análise prossiga.
+
+### Árvore sintática abstrata (AST, +1,0)
+
+Gere com `--ast` e execute com `--ast`:
+
+```powershell
+.\gerador testes\gramaticas\expr.ebnf -o build\expr_ast --ast
+gcc -ansi -pedantic -Wall -Wextra -o build\expr_ast.exe build\expr_ast.c
+.\build\expr_ast.exe --ast testes\programas\expr\aceito_1.txt
+```
+
+A AST mantém os não terminais relevantes e os terminais nomeados com seus
+lexemas. Literais de pontuação e agrupamentos da EBNF são omitidos, evitando
+que símbolos auxiliares dominem a árvore.
+
+### Correção automática de conflitos simples (+0,5)
+
+`--auto-conflicts` aplica fatoração à esquerda quando alternativas compartilham
+diretamente o mesmo primeiro terminal ou não terminal:
+
+```powershell
+.\gerador testes\gramaticas\conflito_ll1.ebnf -o build\conflito --auto-conflicts
+```
+
+Conflitos ambíguos que não têm essa forma continuam sendo rejeitados. Sem a
+opção, a gramática de exemplo continua produzindo o diagnóstico LL(1)
+original.
+
+### EBNF descrita em EBNF (+0,5)
+
+`testes\gramaticas\ebnf.ebnf` descreve formalmente a própria linguagem de
+gramáticas aceita pelo gerador, incluindo `TOKENS`/`EXTERN`, `RULES`, regras,
+alternativas, sequências, opcionais e repetições. Ela pode ser processada
+normalmente pelo próprio gerador:
+
+```powershell
+.\gerador testes\gramaticas\ebnf.ebnf -o build\ebnf --ast --recover
+```

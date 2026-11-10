@@ -4,6 +4,7 @@
 #                   arquivos do TP1 estiverem em microc/)
 #   make microc     gera e compila o analisador de Micro C com o scanner do TP1
 #   make test       executa os testes automatizados
+#   make test-extras executa os testes dos recursos de pontuacao extra
 #   make clean      remove os arquivos gerados
 
 CC      = gcc
@@ -57,7 +58,10 @@ microc/tokens.h microc/microc.flex:
 test: gerador
 	sh testes/executar.sh
 
+test-extras:
+	python -m unittest testes/test_extras.py -v
+
 clean:
 	rm -rf build gerador
 
-.PHONY: all microc test clean
+.PHONY: all microc test test-extras clean
