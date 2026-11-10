@@ -1,7 +1,5 @@
 ## USO_IA.md
 
-Registre aqui cada uso relevante de ferramentas de IA generativa, como no TP1. Se nenhuma foi usada, deixe apenas a frase:
-
 Modelo de entrada:
 
     Ferramenta: Gemini (Google)
@@ -23,3 +21,13 @@ Modelo de entrada:
     Trecho:     bitset.h, conjuntos.c, ll1.c
     Finalidade: Compreender a estrutura e utilidade de BitSet para o cálculo de FIRST e FOLLOW.
     O que fiz:  Consultado, o chat me explicou a representação de conjuntos por mapas de bits (operações bitwise) e como utilizar funções como bitset_unir para gerenciar as iterações de ponto fixo. Além de me ajudar a entender as funções em bitset.h 
+
+    Ferramenta: Gemini (Google)
+    Trecho:     codegen.c 
+    Finalidade: Auxílio na compreensão das funções e ferramentas disponibilizadas no arquivo (como utilizá-las corretamente). 
+    O que fiz:  Consultado, o chat me explicou as funções que eu não tinha entendido.
+
+    Ferramenta: Gemini (Google)
+    Trecho:     codegen.c 
+    Finalidade: Auxílio na tradução de trechos de código enxuto em código C funcional. 
+    O que fiz:  Adaptado.
