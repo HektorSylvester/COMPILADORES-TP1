@@ -11,6 +11,14 @@
 
 /* ---- conjuntos de tokens ---- */
 
+static const int conj_0[] = { LBRACE, ID, SEMICOLON, IF, FOR, RETURN, PRINT, -1 };
+static const int conj_1[] = { INT, CHAR, -1 };
+static const int conj_2[] = { LPAREN, ID, INTEGERCONST, CHARCONST, NOT, -1 };
+static const int conj_3[] = { LPAREN, ID, INTEGERCONST, STRINGCONST, CHARCONST, NOT, -1 };
+static const int conj_4[] = { AND, OR, -1 };
+static const int conj_5[] = { EQ, NEQ, LT, GT, LEQ, GEQ, -1 };
+static const int conj_6[] = { PLUS, MINUS, -1 };
+static const int conj_7[] = { MUL, DIV, MOD, -1 };
 
 /* ---- estado do analisador ---- */
 
@@ -153,10 +161,52 @@ void match(int esperado)
 
 static Token token_de_arquivo(void)
 {
+    static int linha_arq = 0;
+    char buf[1024];
     Token t;
+    int tipo_lido;
+    int linha_token;
+    char lex[512];
+
     memset(&t, 0, sizeof t);
-    fprintf(stderr, "opcao --tokens ainda nao implementada\n");
-    exit(EXIT_FAILURE);
+
+    while (fgets(buf, sizeof buf, arquivo_tokens) != NULL) {
+        char *p = buf;
+        linha_arq++;
+
+        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') {
+            p++;
+        }
+        if (*p == '\0') {
+            continue;
+        }
+
+        lex[0] = '\0';
+        if (sscanf(p, "Token: tipo = %d, lexema = '%[^']', linha = %d",
+                   &tipo_lido, lex, &linha_token) == 3) {
+            t.tipo = tipo_lido;
+            t.linha = linha_token;
+            strncpy(t.lexema, lex, sizeof(t.lexema) - 1);
+            t.lexema[sizeof(t.lexema) - 1] = '\0';
+            return t;
+        }
+
+        if (sscanf(p, "Token: tipo = %d, lexema = '', linha = %d",
+                   &tipo_lido, &linha_token) == 2) {
+            t.tipo = tipo_lido;
+            t.linha = linha_token;
+            t.lexema[0] = '\0';
+            return t;
+        }
+
+        fprintf(stderr, "linha %d do arquivo de tokens malformada: %s\n",
+                linha_arq, buf);
+        exit(EXIT_FAILURE);
+    }
+
+    t.tipo = TOKEN_FIM;
+    t.linha = linha_arq;
+    t.lexema[0] = '\0';
     return t;
 }
 
@@ -165,61 +215,126 @@ static Token token_de_arquivo(void)
 /* programa = 'int' 'main' '(' ')' bloco ; */
 void parse_programa(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(INT);
+    match(MAIN);
+    match(LPAREN);
+    match(RPAREN);
+    parse_bloco();
 }
 
 /* bloco = '{' { declaracao } { comando } '}' ; */
 void parse_bloco(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(LBRACE);
+    while (tok.tipo == INT || tok.tipo == CHAR) {
+        parse_declaracao();
+    }
+    while (pertence(tok.tipo, conj_0)) {
+        parse_comando();
+    }
+    match(RBRACE);
 }
 
 /* declaracao = tipo ID [ '[' INTEGERCONST ']' ] ';' ; */
 void parse_declaracao(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_tipo();
+    match(ID);
+    if (tok.tipo == LBRACKET) {
+        match(LBRACKET);
+        match(INTEGERCONST);
+        match(RBRACKET);
+    }
+    match(SEMICOLON);
 }
 
 /* comando = comando_if | comando_for | atribuicao | comando_return | comando_print | bloco | ';' ; */
 void parse_comando(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    if (tok.tipo == IF) {
+        parse_comando_if();
+    } else if (tok.tipo == FOR) {
+        parse_comando_for();
+    } else if (tok.tipo == ID) {
+        parse_atribuicao();
+    } else if (tok.tipo == RETURN) {
+        parse_comando_return();
+    } else if (tok.tipo == PRINT) {
+        parse_comando_print();
+    } else if (tok.tipo == LBRACE) {
+        parse_bloco();
+    } else if (tok.tipo == SEMICOLON) {
+        match(SEMICOLON);
+    } else {
+        erro_sintatico(conj_0);
+    }
 }
 
 /* tipo = 'int' | 'char' ; */
 void parse_tipo(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    if (tok.tipo == INT) {
+        match(INT);
+    } else if (tok.tipo == CHAR) {
+        match(CHAR);
+    } else {
+        erro_sintatico(conj_1);
+    }
 }
 
 /* comando_if = 'if' '(' expressao ')' comando [ 'else' comando ] ; */
 void parse_comando_if(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(IF);
+    match(LPAREN);
+    parse_expressao();
+    match(RPAREN);
+    parse_comando();
+    if (tok.tipo == ELSE) {
+        match(ELSE);
+        parse_comando();
+    }
 }
 
 /* comando_for = 'for' '(' atribuicao_interna ';' expressao ';' atribuicao_interna ')' comando ; */
 void parse_comando_for(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(FOR);
+    match(LPAREN);
+    parse_atribuicao_interna();
+    match(SEMICOLON);
+    parse_expressao();
+    match(SEMICOLON);
+    parse_atribuicao_interna();
+    match(RPAREN);
+    parse_comando();
 }
 
 /* atribuicao = atribuicao_interna ';' ; */
 void parse_atribuicao(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_atribuicao_interna();
+    match(SEMICOLON);
 }
 
 /* comando_return = 'return' [ expressao ] ';' ; */
 void parse_comando_return(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(RETURN);
+    if (pertence(tok.tipo, conj_2)) {
+        parse_expressao();
+    }
+    match(SEMICOLON);
 }
 
 /* comando_print = 'print' '(' conteudo_print ')' ';' ; */
 void parse_comando_print(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(PRINT);
+    match(LPAREN);
+    parse_conteudo_print();
+    match(RPAREN);
+    match(SEMICOLON);
 }
 
 /* expressao = expressao_logica ; */
@@ -231,49 +346,132 @@ void parse_expressao(void)
 /* atribuicao_interna = ID [ '[' expressao ']' ] '=' expressao ; */
 void parse_atribuicao_interna(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(ID);
+    if (tok.tipo == LBRACKET) {
+        match(LBRACKET);
+        parse_expressao();
+        match(RBRACKET);
+    }
+    match(ASSIGN);
+    parse_expressao();
 }
 
 /* conteudo_print = STRINGCONST | expressao ; */
 void parse_conteudo_print(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    if (tok.tipo == STRINGCONST) {
+        match(STRINGCONST);
+    } else if (pertence(tok.tipo, conj_2)) {
+        parse_expressao();
+    } else {
+        erro_sintatico(conj_3);
+    }
 }
 
 /* expressao_logica = expressao_relacional { ( '&&' | '||' ) expressao_relacional } ; */
 void parse_expressao_logica(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_expressao_relacional();
+    while (tok.tipo == AND || tok.tipo == OR) {
+        if (tok.tipo == AND) {
+            match(AND);
+        } else if (tok.tipo == OR) {
+            match(OR);
+        } else {
+            erro_sintatico(conj_4);
+        }
+        parse_expressao_relacional();
+    }
 }
 
 /* expressao_relacional = expressao_aritmetica [ operador_relacional expressao_aritmetica ] ; */
 void parse_expressao_relacional(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_expressao_aritmetica();
+    if (pertence(tok.tipo, conj_5)) {
+        parse_operador_relacional();
+        parse_expressao_aritmetica();
+    }
 }
 
 /* expressao_aritmetica = termo { ( '+' | '-' ) termo } ; */
 void parse_expressao_aritmetica(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_termo();
+    while (tok.tipo == PLUS || tok.tipo == MINUS) {
+        if (tok.tipo == PLUS) {
+            match(PLUS);
+        } else if (tok.tipo == MINUS) {
+            match(MINUS);
+        } else {
+            erro_sintatico(conj_6);
+        }
+        parse_termo();
+    }
 }
 
 /* operador_relacional = '==' | '!=' | '<' | '>' | '<=' | '>=' ; */
 void parse_operador_relacional(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    if (tok.tipo == EQ) {
+        match(EQ);
+    } else if (tok.tipo == NEQ) {
+        match(NEQ);
+    } else if (tok.tipo == LT) {
+        match(LT);
+    } else if (tok.tipo == GT) {
+        match(GT);
+    } else if (tok.tipo == LEQ) {
+        match(LEQ);
+    } else if (tok.tipo == GEQ) {
+        match(GEQ);
+    } else {
+        erro_sintatico(conj_5);
+    }
 }
 
 /* termo = fator { ( '*' | '/' | '%' ) fator } ; */
 void parse_termo(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_fator();
+    while (tok.tipo == MUL || tok.tipo == DIV || tok.tipo == MOD) {
+        if (tok.tipo == MUL) {
+            match(MUL);
+        } else if (tok.tipo == DIV) {
+            match(DIV);
+        } else if (tok.tipo == MOD) {
+            match(MOD);
+        } else {
+            erro_sintatico(conj_7);
+        }
+        parse_fator();
+    }
 }
 
 /* fator = '(' expressao ')' | ID [ '[' expressao ']' ] | INTEGERCONST | CHARCONST | '!' fator ; */
 void parse_fator(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    if (tok.tipo == LPAREN) {
+        match(LPAREN);
+        parse_expressao();
+        match(RPAREN);
+    } else if (tok.tipo == ID) {
+        match(ID);
+        if (tok.tipo == LBRACKET) {
+            match(LBRACKET);
+            parse_expressao();
+            match(RBRACKET);
+        }
+    } else if (tok.tipo == INTEGERCONST) {
+        match(INTEGERCONST);
+    } else if (tok.tipo == CHARCONST) {
+        match(CHARCONST);
+    } else if (tok.tipo == NOT) {
+        match(NOT);
+        parse_fator();
+    } else {
+        erro_sintatico(conj_2);
+    }
 }
 
 /* ---- programa principal ---- */

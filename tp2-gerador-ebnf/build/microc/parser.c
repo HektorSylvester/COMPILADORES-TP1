@@ -185,24 +185,17 @@ static Token token_de_arquivo(void)
         if (sscanf(p, "Token: tipo = %d, lexema = '%[^']', linha = %d",
                    &tipo_lido, lex, &linha_token) == 3) {
             t.tipo = tipo_lido;
-            t.linha = (size_t)linha_token;
-            t.tamanho = strlen(lex);
-            t.lexema = (char *)malloc(t.tamanho + 1);
-            if (t.lexema != NULL) {
-                strcpy(t.lexema, lex);
-            }
+            t.linha = linha_token;
+            strncpy(t.lexema, lex, sizeof(t.lexema) - 1);
+            t.lexema[sizeof(t.lexema) - 1] = '\0';
             return t;
         }
 
         if (sscanf(p, "Token: tipo = %d, lexema = '', linha = %d",
                    &tipo_lido, &linha_token) == 2) {
             t.tipo = tipo_lido;
-            t.linha = (size_t)linha_token;
-            t.tamanho = 0;
-            t.lexema = (char *)malloc(1);
-            if (t.lexema != NULL) {
-                t.lexema[0] = '\0';
-            }
+            t.linha = linha_token;
+            t.lexema[0] = '\0';
             return t;
         }
 
@@ -212,9 +205,8 @@ static Token token_de_arquivo(void)
     }
 
     t.tipo = TOKEN_FIM;
-    t.linha = (size_t)linha_arq;
-    t.lexema = "";
-    t.tamanho = 0;
+    t.linha = linha_arq;
+    t.lexema[0] = '\0';
     return t;
 }
 

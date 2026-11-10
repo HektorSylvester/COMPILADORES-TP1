@@ -1,3 +1,4 @@
+
 /*
  * scanner.h - O scanner de Micro C do TP1 convertido em funcao
  * (secao 3.1 do enunciado).
@@ -14,8 +15,16 @@
 #include <stdio.h>
 #include "tokens.h"
 
+/* O analisador sintático gerado depende estritamente desta estrutura */
+typedef struct {
+    TokenType tipo;
+    char lexema[100];
+    int linha;
+} Token;
+
 /* Prepara o scanner para ler de entrada (ja aberto). */
 void  scanner_iniciar(FILE *entrada);
+
 
 /* Devolve o proximo token. No fim da entrada devolve END_OF_FILE; em
  * erro lexico devolve UNDEF com a mensagem de erro em lexema. */

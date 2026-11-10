@@ -7,7 +7,7 @@
  * que mantenha a variavel global linha_atual (TP1, secao 4.4). Sem
  * alteracoes, o lexema de cada token e o texto reconhecido (microc_yytext).
  *
- * TODO(aluno): adaptar os pontos marcados ao seu TP1, para que
+ * DONE(aluno): adaptar os pontos marcados ao seu TP1, para que
  *   - ID e constantes usem o texto do Symbol (microc_yylval.symbol), ja
  *     com as sequencias de escape convertidas (TP1, secao 4.3);
  *   - UNDEF traga a mensagem de microc_yylval.error_msg
@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "scanner.h"
+#include "tokens.h"
 
 /* ---- simbolos do scanner gerado pelo flex (ajuste ao seu TP1) ---- */
 extern int   microc_yylex(void);
@@ -27,13 +28,26 @@ extern int   microc_yylex_destroy(void);
 
 /* Texto a guardar em Token.lexema para o token que microc_yylex acabou
  * de devolver. */
+
+
 static const char *texto_do_lexema(int tipo)
 {
-    /* TODO(aluno): para ID, INTEGERCONST, CHARCONST e STRINGCONST, devolva
-     * o texto do Symbol em microc_yylval.symbol; para UNDEF, devolva
-     * microc_yylval.error_msg. */
-    (void) tipo;
-    return microc_yytext;
+    /*DONE(aluno): para ID, INTEGERCONST, CHARCONST e STRINGCONST, devolva
+    * o texto do Symbol em microc_yylval.symbol; para UNDEF, devolva
+    * microc_yylval.error_msg. */
+
+    if (tipo == ID || tipo == INTEGERCONST || tipo == CHARCONST || tipo == STRINGCONST) 
+    {
+        if (microc_yylval.symbol != NULL) 
+            return microc_yylval.symbol;
+    }
+
+    if (tipo == UNDEF) 
+        if (microc_yylval.error_msg != NULL) 
+            return microc_yylval.error_msg;
+
+    /* Fallback para o texto cru reconhecido */
+    return microc_yytext ? microc_yytext : "";
 }
 
 /* O TP1 permite que tokens de um caractere sejam devolvidos pelo proprio
@@ -42,6 +56,7 @@ static const char *texto_do_lexema(int tipo)
  * Cuidado: valores ate o ultimo item da enumeracao (PRINT = 36 no
  * tokens.h do livro) sao sempre TokenType. Por isso '!' (33, que e
  * RETURN), '"', '#' e '$' nao podem ser devolvidos como ASCII. */
+
 static TokenType normalizar(int tipo)
 {
     if (tipo <= (int) PRINT)
@@ -81,20 +96,25 @@ Token proximo_token(void)
 
     memset(&t, 0, sizeof t);
     tipo = microc_yylex();
-    /* Observacao: o flex devolve 0 no fim da entrada, mas 0 e UNDEF no
-     * tokens.h. O TP1 deve devolver END_OF_FILE na regra <<EOF>>. */
+
     t.tipo = normalizar(tipo);
     t.linha = linha_atual;
-    texto = t.tipo == END_OF_FILE ? "" : texto_do_lexema(tipo);
+    texto = (t.tipo == END_OF_FILE) ? "" : texto_do_lexema(tipo);
+
     if (texto != NULL) {
-        strncpy(t.lexema, texto, sizeof t.lexema - 1);
-        t.lexema[sizeof t.lexema - 1] = '\0';
+        strncpy(t.lexema, texto, sizeof(t.lexema) - 1);
+        t.lexema[sizeof(t.lexema) - 1] = '\0';
+    } else {
+        t.lexema[0] = '\0';
     }
+
     return t;
 }
 
 void scanner_finalizar(void)
 {
-    /* TODO(aluno): liberar tambem a tabela de strings do TP1. */
+    /* DONE(aluno): liberar tambem a tabela de strings do TP1. */
+    liberar_tabela_ident();
+
     microc_yylex_destroy();
 }

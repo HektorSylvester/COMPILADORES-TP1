@@ -1,6 +1,0 @@
---- testes/programas/expr/rejeitado_2.esperado	2026-11-07 13:40:04.728280400 -0400
-+++ build/testes/expr-rejeitado_2.txt.saida	2026-11-08 13:54:06.348238800 -0400
-@@ -1,2 +1,2 @@
--linha 2, coluna 1: encontrado fim de arquivo, esperado ')'
-+linha 1, coluna 1: encontrado '(', esperado fim de arquivo
- status 1

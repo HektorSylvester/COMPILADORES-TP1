@@ -51,3 +51,13 @@ Modelo de entrada:
     Trecho:     microc_mapa.c 
     Finalidade: Ajuda na verificação de se deixei passar algum identificador da lista. 
     O que fiz:  Adaptado.
+
+    Ferramenta: Gemini (Google)
+    Trecho:     tokens.h 
+    Finalidade: Estava conferindo se estavam corretas às alterações feitas após o TP1 (eu percebi que tinha deixado uma variável local e ela devia ser global) e o chat me sugeriu criar uma função para liberar a memória da tabela de identificadores (isso não tinha sido implementado no TP1). 
+    O que fiz:  Adaptado.
+
+    Ferramenta: Gemini (Google)
+    Trecho:     scanner.c, scanner.h e tokens.h 
+    Finalidade: Fiz passar em 15 de 17 testes. Precisei de ajuda com os 2 que faltaram.
+    O que fiz:  Adaptado.

@@ -1,0 +1,6 @@
+--- testes/programas/microc/rejeitado_lexico.esperado	2026-11-10 01:40:29.341945000 -0400
++++ build/testes/microc-rejeitado_lexico.mc.saida	2026-11-10 01:57:13.517927500 -0400
+@@ -1,2 +1,2 @@
+-linha 2: erro lexico: String nao terminada
++linha 3: erro lexico: String nao terminada
+ status 1

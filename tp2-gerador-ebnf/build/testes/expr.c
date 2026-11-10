@@ -11,6 +11,9 @@
 
 /* ---- conjuntos de tokens ---- */
 
+static const int conj_0[] = { T_MAIS, T_MENOS, -1 };
+static const int conj_1[] = { T_VEZES, T_BARRA, -1 };
+static const int conj_2[] = { T_NUM, T_ID, T_ABRE_PAR, -1 };
 
 /* ---- estado do analisador ---- */
 
@@ -66,25 +69,181 @@ static void consumir(size_t n)
 /* SKIP: [ \t\r\n]+ */
 static size_t casa_skip_0(const char *s)
 {
-    /* TODO(aluno): automato para [ \t\r\n]+ */
-    (void) s;
-    return 0;
+    size_t pos = 0;
+    size_t melhor = 0;
+    int estado = 0;
+    unsigned char c;
+
+    while (s[pos] != '\0') {
+        c = (unsigned char)s[pos];
+        switch (estado) {
+        case 0:
+            if (c >= 9 && c <= 10) {
+                estado = 1;
+            }
+            else if (c == 13) {
+                estado = 1;
+            }
+            else if (c == ' ') {
+                estado = 1;
+            }
+            else {
+                goto fim;
+            }
+            break;
+        case 1:
+            if (c >= 9 && c <= 10) {
+                estado = 1;
+            }
+            else if (c == 13) {
+                estado = 1;
+            }
+            else if (c == ' ') {
+                estado = 1;
+            }
+            else {
+                goto fim;
+            }
+            break;
+        default:
+            goto fim;
+        }
+
+        pos++;
+        switch (estado) {
+        case 1:
+            melhor = pos;
+            break;
+        default:
+            break;
+        }
+    }
+
+fim:
+    return melhor;
 }
 
 /* NUM: [0-9]+ */
 static size_t casa_T_NUM(const char *s)
 {
-    /* TODO(aluno): automato para [0-9]+ */
-    (void) s;
-    return 0;
+    size_t pos = 0;
+    size_t melhor = 0;
+    int estado = 0;
+    unsigned char c;
+
+    while (s[pos] != '\0') {
+        c = (unsigned char)s[pos];
+        switch (estado) {
+        case 0:
+            if (c >= '0' && c <= '9') {
+                estado = 1;
+            }
+            else {
+                goto fim;
+            }
+            break;
+        case 1:
+            if (c >= '0' && c <= '9') {
+                estado = 1;
+            }
+            else {
+                goto fim;
+            }
+            break;
+        default:
+            goto fim;
+        }
+
+        pos++;
+        switch (estado) {
+        case 1:
+            melhor = pos;
+            break;
+        default:
+            break;
+        }
+    }
+
+fim:
+    return melhor;
 }
 
 /* ID: [a-zA-Z_][a-zA-Z0-9_]* */
 static size_t casa_T_ID(const char *s)
 {
-    /* TODO(aluno): automato para [a-zA-Z_][a-zA-Z0-9_]* */
-    (void) s;
-    return 0;
+    size_t pos = 0;
+    size_t melhor = 0;
+    int estado = 0;
+    unsigned char c;
+
+    while (s[pos] != '\0') {
+        c = (unsigned char)s[pos];
+        switch (estado) {
+        case 0:
+            if (c >= 'A' && c <= 'Z') {
+                estado = 1;
+            }
+            else if (c == '_') {
+                estado = 1;
+            }
+            else if (c >= 'a' && c <= 'z') {
+                estado = 1;
+            }
+            else {
+                goto fim;
+            }
+            break;
+        case 1:
+            if (c >= '0' && c <= '9') {
+                estado = 2;
+            }
+            else if (c >= 'A' && c <= 'Z') {
+                estado = 2;
+            }
+            else if (c == '_') {
+                estado = 2;
+            }
+            else if (c >= 'a' && c <= 'z') {
+                estado = 2;
+            }
+            else {
+                goto fim;
+            }
+            break;
+        case 2:
+            if (c >= '0' && c <= '9') {
+                estado = 2;
+            }
+            else if (c >= 'A' && c <= 'Z') {
+                estado = 2;
+            }
+            else if (c == '_') {
+                estado = 2;
+            }
+            else if (c >= 'a' && c <= 'z') {
+                estado = 2;
+            }
+            else {
+                goto fim;
+            }
+            break;
+        default:
+            goto fim;
+        }
+
+        pos++;
+        switch (estado) {
+        case 1:
+        case 2:
+            melhor = pos;
+            break;
+        default:
+            break;
+        }
+    }
+
+fim:
+    return melhor;
 }
 
 static const char *const texto_literais[] = {
@@ -262,10 +421,52 @@ void match(int esperado)
 
 static Token token_de_arquivo(void)
 {
+    static int linha_arq = 0;
+    char buf[1024];
     Token t;
+    int tipo_lido;
+    int linha_token;
+    char lex[512];
+
     memset(&t, 0, sizeof t);
-    fprintf(stderr, "opcao --tokens ainda nao implementada\n");
-    exit(EXIT_FAILURE);
+
+    while (fgets(buf, sizeof buf, arquivo_tokens) != NULL) {
+        char *p = buf;
+        linha_arq++;
+
+        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') {
+            p++;
+        }
+        if (*p == '\0') {
+            continue;
+        }
+
+        lex[0] = '\0';
+        if (sscanf(p, "Token: tipo = %d, lexema = '%[^']', linha = %d",
+                   &tipo_lido, lex, &linha_token) == 3) {
+            t.tipo = tipo_lido;
+            t.linha = linha_token;
+            strncpy(t.lexema, lex, sizeof(t.lexema) - 1);
+            t.lexema[sizeof(t.lexema) - 1] = '\0';
+            return t;
+        }
+
+        if (sscanf(p, "Token: tipo = %d, lexema = '', linha = %d",
+                   &tipo_lido, &linha_token) == 2) {
+            t.tipo = tipo_lido;
+            t.linha = linha_token;
+            t.lexema[0] = '\0';
+            return t;
+        }
+
+        fprintf(stderr, "linha %d do arquivo de tokens malformada: %s\n",
+                linha_arq, buf);
+        exit(EXIT_FAILURE);
+    }
+
+    t.tipo = TOKEN_FIM;
+    t.linha = linha_arq;
+    t.lexema[0] = '\0';
     return t;
 }
 
@@ -274,19 +475,49 @@ static Token token_de_arquivo(void)
 /* expr = term { ( '+' | '-' ) term } ; */
 void parse_expr(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_term();
+    while (tok.tipo == T_MAIS || tok.tipo == T_MENOS) {
+        if (tok.tipo == T_MAIS) {
+            match(T_MAIS);
+        } else if (tok.tipo == T_MENOS) {
+            match(T_MENOS);
+        } else {
+            erro_sintatico(conj_0);
+        }
+        parse_term();
+    }
 }
 
 /* term = factor { ( '*' | '/' ) factor } ; */
 void parse_term(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_factor();
+    while (tok.tipo == T_VEZES || tok.tipo == T_BARRA) {
+        if (tok.tipo == T_VEZES) {
+            match(T_VEZES);
+        } else if (tok.tipo == T_BARRA) {
+            match(T_BARRA);
+        } else {
+            erro_sintatico(conj_1);
+        }
+        parse_factor();
+    }
 }
 
 /* factor = NUM | ID | '(' expr ')' ; */
 void parse_factor(void)
 {
-    /* TODO(aluno): construcao ainda nao traduzida */
+    if (tok.tipo == T_NUM) {
+        match(T_NUM);
+    } else if (tok.tipo == T_ID) {
+        match(T_ID);
+    } else if (tok.tipo == T_ABRE_PAR) {
+        match(T_ABRE_PAR);
+        parse_expr();
+        match(T_FECHA_PAR);
+    } else {
+        erro_sintatico(conj_2);
+    }
 }
 
 /* ---- programa principal ---- */

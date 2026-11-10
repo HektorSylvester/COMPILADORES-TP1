@@ -1,6 +1,0 @@
---- testes/programas/expr/rejeitado_1.esperado	2026-11-07 13:40:04.734319700 -0400
-+++ build/testes/expr-rejeitado_1.txt.saida	2026-11-08 13:54:06.261550500 -0400
-@@ -1,2 +1,2 @@
--linha 1, coluna 10: encontrado ')', esperado um de {NUM, ID, '('}
-+linha 1, coluna 1: erro lexico: caractere invalido '2'
- status 1

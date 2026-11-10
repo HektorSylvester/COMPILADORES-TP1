@@ -1,7 +1,0 @@
---- testes/programas/expr/aceito_2.esperado	2026-11-07 13:40:04.765162200 -0400
-+++ build/testes/expr-aceito_2.txt.saida	2026-11-08 13:54:06.097470800 -0400
-@@ -1,2 +1,2 @@
--entrada aceita
--status 0
-+linha 1, coluna 1: erro lexico: caractere invalido 'a'
-+status 1

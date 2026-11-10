@@ -1,6 +1,0 @@
---- testes/programas/expr/rejeitado_4.esperado	2026-11-07 13:40:04.725097500 -0400
-+++ build/testes/expr-rejeitado_4.txt.saida	2026-11-08 13:54:06.581604300 -0400
-@@ -1,2 +1,2 @@
--linha 1, coluna 3: encontrado '2', esperado fim de arquivo
-+linha 1, coluna 1: erro lexico: caractere invalido '1'
- status 1

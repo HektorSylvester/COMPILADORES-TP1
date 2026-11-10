@@ -1,11 +1,93 @@
+%option prefix="microc_yy"
+%option noyywrap
+
 %{
     #include <stdio.h>
     #include <stdlib.h>
     #include <string.h>
     #include "tokens.h"
+%}
 
+%option prefix="microc_yy"
+%option noyywrap
 
-    
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "tokens.h"
+
+YYSTYPE microc_yylval;
+int linha_atual = 1;
+static int ultimo_token = 0;
+
+/* Tabela de Identificadores */
+typedef struct identificador {
+    char *lexema;
+    struct identificador *prox;
+} identificador;
+
+static identificador *tabela_ident = NULL;
+
+static char* inserir(const char *texto)
+{
+    identificador *atual = tabela_ident;
+    identificador *novo;
+
+    while(atual != NULL) {
+        if (strcmp(atual->lexema, texto) == 0)
+            return atual->lexema;
+        atual = atual->prox;
+    }
+
+    novo = (identificador*)malloc(sizeof(identificador));
+    if (novo) {
+        novo->lexema = (char*)malloc(strlen(texto) + 1);
+        if (novo->lexema) strcpy(novo->lexema, texto);
+        novo->prox = tabela_ident;
+        tabela_ident = novo;
+        return novo->lexema;
+    }
+    return NULL; 
+}
+
+void liberar_tabela_ident(void)
+{
+    identificador *atual = tabela_ident;
+    while (atual != NULL) {
+        identificador *prox = atual->prox;
+        if (atual->lexema) free(atual->lexema);
+        free(atual);
+        atual = prox;
+    }
+    tabela_ident = NULL;
+}
+
+static int retorna_token(int tok) 
+{
+    ultimo_token = tok;
+    return tok;
+}
+
+/* O flex usa microc_yytext devido ao prefixo */
+extern char *microc_yytext;
+static void guarda_lexema(void) 
+{
+    microc_yylval.symbol = inserir(microc_yytext);
+}
+
+static TokenType Checa_Palavra_Reservada(const char *lexema) 
+{
+    const char *palavras_R[] = {"main", "if", "else", "for", "return", "int", "char", "print"};
+    TokenType tokens_R[] = {MAIN, IF, ELSE, FOR, RETURN, INT, CHAR, PRINT};
+    int i;
+    for(i = 0; i < 8; i++) {
+        if (strcmp(lexema, palavras_R[i]) == 0) return tokens_R[i];
+    }
+    return (TokenType) retorna_token(ID);
+}
+%}
+
 /* 2. SECAO DE DEFINICOES ------------------------------------- */
 
 DIGIT       [0-9]
@@ -14,17 +96,16 @@ ALFANUM     [a-zA-Z0-9_]
 
 %x COMMENT
 
+
+/* -----------------------------------------------------------------------
+* 3. SECAO DE REGRAS
+* --------------------------------------------------------------------- */
+
+/* --- Fim de arquivo -----------------------------------------------------
+* Tratada explicitamente (em vez de depender do retorno automatico 0 do flex), pois o token UNDEF tambem vale 0 no enum TokenType -- se
+* dependessemos do comportamento padrao, um erro lexico seria confundido com o fim do arquivo pelo main() de teste abaixo. */
+
 %%
-
-
- /* -----------------------------------------------------------------------
-  * 3. SECAO DE REGRAS
-  * --------------------------------------------------------------------- */
-
- /* --- Fim de arquivo -----------------------------------------------------
-  * Tratada explicitamente (em vez de depender do retorno automatico 0 do flex), pois o token UNDEF tambem vale 0 no enum TokenType -- se
-  * dependessemos do comportamento padrao, um erro lexico seria confundido com o fim do arquivo pelo main() de teste abaixo. */
-
 <INITIAL><<EOF>>             { return END_OF_FILE; }
 
  /* --- Espacos em branco e quebras de linha ---------------------------- */
@@ -145,11 +226,11 @@ ALFANUM     [a-zA-Z0-9_]
 
  /* Quebra de linha sem a aspa de fechamento. */
 \"([^"\\\n\0]|\\n|\\t|\\\\|\\\"|\\0)*\n {
-        linha_atual++;
-        microc_yylval.error_msg = "String nao terminada";
-        return retorna_token(UNDEF);
-    }
-
+    yyless(yyleng - 1);
+    microc_yylval.error_msg = "String nao terminada";
+    return retorna_token(UNDEF);
+}
+    
  /* Fim do arquivo antes da aspa de fechamento. */
 \"([^"\\\n\0]|\\n|\\t|\\\\|\\\"|\\0)* {
         microc_yylval.error_msg = "EOF em string";
@@ -200,47 +281,10 @@ ALFANUM     [a-zA-Z0-9_]
  * 4. SUB-ROTINAS DO USUARIO
  * ------------------------------------------------------------------- */
 
-/* yywrap: informa ao flex que, ao atingir o EOF, a leitura deve simplesmente parar (nao ha um proximo arquivo a processar). */
-int yywrap(void) 
+#if 0
+int main(int argc, char **argv)
 {
-    return 1;
-}
-
-/* main() de teste: le o arquivo passado como argumento e imprime, para cada token reconhecido, seu tipo, lexema e linha -- no mesmo espirito
- * do utilitario "lexer" mencionado no enunciado (Secao 6). Este main() e apenas uma ferramenta de depuracao para voce testar seu scanner de
- * forma isolada; ele NAO faz parte da interface formal entre o scanner e o parser (isso sera tratado nos trabalhos seguintes). */
-
-int main(int argc, char **argv) 
-{
-    if (argc < 2) 
-    {
-        fprintf(stderr, "Uso: %s <arquivo.mc>\n", argv[0]);
-        return 1;
-    }
-
-    FILE *arquivo_fonte = fopen(argv[1], "r");
-    if (!arquivo_fonte) 
-    {
-        fprintf(stderr, "Erro: nao foi possivel abrir o arquivo '%s'\n", argv[1]);
-        return 1;
-    }
-    yyin = arquivo_fonte;
-
-    int tipo;
-    while ((tipo = yylex()) != END_OF_FILE) 
-    {
-        if (tipo == UNDEF) 
-        {
-            fprintf(stderr, "ERRO LEXICO (linha %d): %s\n",
-                    linha_atual, microc_yylval.error_msg);
-            continue;
-        }
-        printf("Token: tipo = %-13s lexema = '%s'  linha = %d\n",
-               nome_token[tipo], yytext, linha_atual);
-    }
-
-    fclose(arquivo_fonte);
-    /*imprime_tabela();*/
+    /* rotina antiga de testes do TP1 isolada */
     return 0;
-
 }
+#endif
