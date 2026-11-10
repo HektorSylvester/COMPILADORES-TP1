@@ -31,3 +31,13 @@ Modelo de entrada:
     Trecho:     codegen.c 
     Finalidade: Auxílio na tradução de trechos de código enxuto em código C funcional. 
     O que fiz:  Adaptado.
+
+    Ferramenta: Gemini (Google)
+    Trecho:     codegen.c 
+    Finalidade: Sobre o AFN de Thompson: eu estava cometendo relevantes conceituais e o chat me ajudou a planejar a implementação da seção em 4 etapas (como sugerido pelo enunciado). 
+    O que fiz: Consultado.
+
+    Ferramenta: Gemini (Google)
+    Trecho:     codegen.c 
+    Finalidade: Precisei de ajuda (e de uma intervenção divina) na implementação do AFN (eu já cometi todos os erros de sintaxe imagináveis à esse ponto), além disso o chat me sugeriu funções auxiliares que poderiam "descomplicar" as funções iniciais que eu havia planejado. 
+    O que fiz: Adaptado.

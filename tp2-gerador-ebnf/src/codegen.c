@@ -31,6 +31,10 @@
 #include "microc_mapa.h"
 #include "util.h"
 
+#define TRANSICAO_EPSILON -1
+#define AFN_EPSILON -1
+
+
 /* ------------------------------------------------------------------ */
 /* Emissao de texto                                                   */
 /* ------------------------------------------------------------------ */
@@ -391,24 +395,950 @@ static void gen_expr(Emissor *em, const Gramatica *g, const Expr *e)
  * que devolve o comprimento do MAIOR prefixo de s reconhecido pela
  * expressao regular, ou 0 se nenhum prefixo for reconhecido.
  * Retorna 0 se a expressao for valida (senao reporte com diag_erro). */
+
+typedef struct {
+    unsigned char bits[32]; /* 256 bits para cobrir todos os bytes (0 a 255) */
+} ConjuntoChar;
+
+static void conj_limpar(ConjuntoChar *c)
+{
+    memset(c->bits, 0, sizeof(c->bits));
+}
+
+static void conj_adicionar(ConjuntoChar *c, unsigned char ch)
+{
+    c->bits[ch / 8] |= (unsigned char)(1 << (ch % 8));
+}
+
+static int conj_contem(const ConjuntoChar *c, unsigned char ch)
+{
+    return (c->bits[ch / 8] & (1 << (ch % 8))) != 0;
+}
+
+static void conj_inverter(ConjuntoChar *c)
+{
+    int i;
+    for (i = 0; i < 32; i++) 
+        c->bits[i] = (unsigned char)~c->bits[i];
+}
+
+/* Le um caractere com suporte a escapes (\n, \t, \\, \/, etc.) */
+static int ler_char_com_escape(const char *s, size_t *pos, unsigned char *saida)
+{
+    if (s[*pos] == '\0')
+        return 0;
+
+    if (s[*pos] == '\\') 
+    {
+        (*pos)++;
+        switch (s[*pos])
+        {
+            case 'n':  
+                *saida = '\n'; 
+                break;
+            case 't':  
+                *saida = '\t'; 
+                break;
+            case 'r':  
+                *saida = '\r'; 
+                break;
+            case '\\': 
+                *saida = '\\'; 
+                break;
+            case '/':  
+                *saida = '/';  
+                    break;
+            case '\0': 
+                return 0; /* escape incompleto no fim da string */
+            default:    
+                *saida = (unsigned char)s[*pos]; 
+                break;
+        }
+
+        (*pos)++;
+        return 1;
+    }
+
+    *saida = (unsigned char)s[*pos];
+    (*pos)++;
+    return 1;
+}
+
+/* Analisa ¡[a-z], [^0-9]¡ e preenche o ConjuntoChar */
+static int parse_classe_chars(const char *s, size_t *pos, ConjuntoChar *conj)
+{
+    int invertido = 0;
+    unsigned char c1;
+    unsigned char c2;
+    unsigned char ch;
+
+    conj_limpar(conj);
+    (*pos)++; /* pula o '[' inicial */
+
+    if (s[*pos] == '^') 
+    {
+        invertido = 1;
+        (*pos)++;
+    }
+
+    /* Caso especial: ']' logo no comeco da classe e tratado como caractere literal */
+    if (s[*pos] == ']') 
+    {
+        conj_adicionar(conj, ']');
+        (*pos)++;
+    }
+
+    while (s[*pos] != '\0' && s[*pos] != ']') 
+    {
+        if (!ler_char_com_escape(s, pos, &c1))
+            return 0;
+
+        /* Verifica a-z ou 0-9 */
+        if (s[*pos] == '-' && s[*pos + 1] != '\0' && s[*pos + 1] != ']') 
+        {
+            (*pos)++; /* pula o '-' */
+            if (!ler_char_com_escape(s, pos, &c2))
+                return 0;
+
+            if (c1 > c2)
+                return 0; /* algo como [z-a] e erro */
+
+            for (ch = c1; ch <= c2; ch++) 
+            {
+                conj_adicionar(conj, ch);
+                if (ch == 255) break; /* previne overflow de unsigned char */
+            }
+        } else 
+        {
+            conj_adicionar(conj, c1);
+        }
+    }
+
+    if (s[*pos] != ']')
+        return 0; /* Erro: colchete nunca foi fechado */
+
+    (*pos)++; /* pula o ']' */
+
+    if (invertido)
+        conj_inverter(conj);
+
+    return 1;
+}
+
+typedef enum 
+{
+    REGEX_CHARSET,   /* caractere ConjuntoChar */
+    REGEX_CONCAT,    /* Sequência*/
+    REGEX_UNIAO,     /* Alternativa */
+    REGEX_ESTRELA,   /* Fechamento */
+    REGEX_MAIS,      /* (1 ou mais) */
+    REGEX_OPCIONAL   /* Opcional */
+} TipoNoRegex;
+
+typedef struct NoRegex 
+{
+    TipoNoRegex tipo;
+    ConjuntoChar conjunto;
+    struct NoRegex *esq;
+    struct NoRegex *dir;
+} NoRegex;
+
+static NoRegex *criar_no_regex(TipoNoRegex tipo)
+{
+    NoRegex *no = (NoRegex *)malloc(sizeof(NoRegex));
+
+    if (no == NULL)
+        return NULL;
+
+    no->tipo = tipo;
+    conj_limpar(&no->conjunto);
+    no->esq = NULL;
+    no->dir = NULL;
+
+    return no;
+}
+
+static void liberar_arvore_regex(NoRegex *no)
+{
+    if (no == NULL)
+        return;
+
+    liberar_arvore_regex(no->esq);
+    liberar_arvore_regex(no->dir);
+
+    free(no);
+}
+
+/* Declarações prévias para recursão */
+static NoRegex *parse_regex_uniao(const char *s, size_t *pos);
+static NoRegex *parse_regex_concat(const char *s, size_t *pos);
+static NoRegex *parse_regex_sufixo(const char *s, size_t *pos);
+static NoRegex *parse_regex_atomo(const char *s, size_t *pos);
+
+/* Átomo */
+static NoRegex *parse_regex_atomo(const char *s, size_t *pos)
+{
+    NoRegex *no;
+    unsigned char ch;
+    int i;
+
+    if (s[*pos] == '\0')
+        return NULL;
+
+    /*exceto quebra de linha '\n' */
+    if (s[*pos] == '.') 
+    {
+        (*pos)++;
+        no = criar_no_regex(REGEX_CHARSET);
+
+        if (no == NULL) return NULL;
+
+        for (i = 0; i < 256; i++)
+            if (i != '\n')
+                conj_adicionar(&no->conjunto, (unsigned char)i);
+        
+        return no;
+    }
+
+    /* Classe de caracteres */
+    if (s[*pos] == '[') 
+    {
+        no = criar_no_regex(REGEX_CHARSET);
+
+        if (no == NULL) 
+            return NULL;
+
+        if (!parse_classe_chars(s, pos, &no->conjunto)) 
+        {
+            liberar_arvore_regex(no);
+            return NULL;
+        }
+
+        return no;
+    }
+
+    /* Subexpressão entre parênteses*/
+    if (s[*pos] == '(') 
+    {
+        (*pos)++; /*'(' */
+
+        no = parse_regex_uniao(s, pos);
+
+        if (no == NULL)
+            return NULL;
+
+        if (s[*pos] != ')') 
+        {
+            liberar_arvore_regex(no);
+            return NULL; /* Erro: parêntese não fechado */
+        }
+
+        (*pos)++; /* ')' */
+
+        return no;
+    }
+
+    /* Caracteres reservados não podem iniciar um átomo solto */
+    if (s[*pos] == ')' || s[*pos] == '|' || s[*pos] == '*' || s[*pos] == '+' || s[*pos] == '?')
+        return NULL;
+
+    /* Caractere escapado */
+    if (!ler_char_com_escape(s, pos, &ch))
+        return NULL;
+
+    no = criar_no_regex(REGEX_CHARSET);
+
+    if (no == NULL) 
+        return NULL;
+
+    conj_adicionar(&no->conjunto, ch);
+
+    return no;
+}
+
+/* Sufixos: *, + e ? */
+static NoRegex *parse_regex_sufixo(const char *s, size_t *pos)
+{
+    NoRegex *no = parse_regex_atomo(s, pos);
+    NoRegex *pai;
+
+    if (no == NULL)
+        return NULL;
+
+    while (s[*pos] == '*' || s[*pos] == '+' || s[*pos] == '?') 
+    {
+        TipoNoRegex tipo_op;
+
+        if (s[*pos] == '*')     
+             tipo_op = REGEX_ESTRELA;
+        else if (s[*pos] == '+') 
+            tipo_op = REGEX_MAIS;
+        else                     
+            tipo_op = REGEX_OPCIONAL;
+
+        (*pos)++;
+
+        pai = criar_no_regex(tipo_op);
+
+        if (pai == NULL) 
+        {
+            liberar_arvore_regex(no);
+            return NULL;
+        }
+
+        pai->esq = no;
+        no = pai;
+    }
+
+    return no;
+}
+
+/* Concatenação*/
+static NoRegex *parse_regex_concat(const char *s, size_t *pos)
+{
+    NoRegex *esq = parse_regex_sufixo(s, pos);
+    NoRegex *dir;
+    NoRegex *no_concat;
+
+    if (esq == NULL)
+        return NULL;
+
+    /* Enquanto houver caracteres que não fecham parêntese nem unem alternativas */
+    while (s[*pos] != '\0' && s[*pos] != '|' && s[*pos] != ')') 
+    {
+        dir = parse_regex_sufixo(s, pos);
+        if (dir == NULL) 
+        {
+            liberar_arvore_regex(esq);
+            return NULL;
+        }
+
+        no_concat = criar_no_regex(REGEX_CONCAT);
+
+        if (no_concat == NULL) 
+        {
+            liberar_arvore_regex(esq);
+            liberar_arvore_regex(dir);
+            return NULL;
+        }
+
+        no_concat->esq = esq;
+        no_concat->dir = dir;
+        esq = no_concat;
+    }
+
+    return esq;
+}
+
+/* União: menor precedência */
+static NoRegex *parse_regex_uniao(const char *s, size_t *pos)
+{
+    NoRegex *esq = parse_regex_concat(s, pos);
+    NoRegex *dir;
+    NoRegex *no_uniao;
+
+    if (esq == NULL)
+        return NULL;
+
+    while (s[*pos] == '|') 
+    {
+        (*pos)++; /* pula '|' */
+
+        dir = parse_regex_concat(s, pos);
+
+        if (dir == NULL) 
+        {
+            liberar_arvore_regex(esq);
+            return NULL;
+        }
+
+        no_uniao = criar_no_regex(REGEX_UNIAO);
+
+        if (no_uniao == NULL) 
+        {
+            liberar_arvore_regex(esq);
+            liberar_arvore_regex(dir);
+            return NULL;
+        }
+
+        no_uniao->esq = esq;
+        no_uniao->dir = dir;
+        esq = no_uniao;
+    }
+
+    return esq;
+}
+
+
+static NoRegex *compilar_arvore_regex(const char *regex)
+{
+    size_t pos = 0;
+    NoRegex *raiz = parse_regex_uniao(regex, &pos);
+
+    if (raiz == NULL || regex[pos] != '\0') 
+    {
+        liberar_arvore_regex(raiz);
+        return NULL; /* Erro de sintaxe */
+    }
+
+    return raiz;
+}
+
+
+typedef struct 
+{
+    int destino;
+    int rotulo;   /* AFN_EPSILON | 0 para transicao com ConjuntoChar */
+    ConjuntoChar conjunto;
+} TransicaoAFN;
+
+typedef struct 
+{
+    TransicaoAFN transicoes[2];
+    int num_transicoes;
+} EstadoAFN;
+
+typedef struct 
+{
+    EstadoAFN *estados;
+    int total_estados;
+    int capacidade;
+} GrafoAFN;
+
+typedef struct 
+{
+    int inicio;
+    int fim;
+} FragmentoAFN;
+
+static int afn_novo_estado(GrafoAFN *afn)
+{
+    int id;
+    if (afn->total_estados >= afn->capacidade) 
+    {
+        int nova_cap = (afn->capacidade == 0) ? 16 : afn->capacidade * 2;
+
+        EstadoAFN *novo = (EstadoAFN *)realloc(afn->estados, (size_t)nova_cap * sizeof(EstadoAFN));
+        
+        if (novo == NULL)
+            return -1;
+
+        afn->estados = novo;
+        afn->capacidade = nova_cap;
+    }
+
+    id = afn->total_estados++;
+    afn->estados[id].num_transicoes = 0;
+
+    return id;
+}
+
+static void afn_add_transicao(GrafoAFN *afn, int origem, int destino, int rotulo, const ConjuntoChar *conj)
+{
+    EstadoAFN *est = &afn->estados[origem];
+    int idx = est->num_transicoes++;
+
+    est->transicoes[idx].destino = destino;
+    est->transicoes[idx].rotulo = rotulo;
+
+    if (rotulo != AFN_EPSILON && conj != NULL) 
+        est->transicoes[idx].conjunto = *conj;
+    else 
+        conj_limpar(&est->transicoes[idx].conjunto);
+    
+}
+
+
+static FragmentoAFN thompson_construir(GrafoAFN *afn, const NoRegex *no)
+{
+    FragmentoAFN frag;
+    FragmentoAFN esq;
+    FragmentoAFN dir;
+
+    frag.inicio = -1;
+    frag.fim = -1;
+
+    if (no == NULL)
+        return frag;
+
+    switch (no->tipo) 
+    {
+        case REGEX_CHARSET:
+            frag.inicio = afn_novo_estado(afn);
+            frag.fim = afn_novo_estado(afn);
+            afn_add_transicao(afn, frag.inicio, frag.fim, 0, &no->conjunto);
+
+            break;
+
+        case REGEX_CONCAT:
+            esq = thompson_construir(afn, no->esq);
+            dir = thompson_construir(afn, no->dir);
+            afn_add_transicao(afn, esq.fim, dir.inicio, AFN_EPSILON, NULL);
+            frag.inicio = esq.inicio;
+            frag.fim = dir.fim;
+
+            break;
+
+        case REGEX_UNIAO:
+            esq = thompson_construir(afn, no->esq);
+            dir = thompson_construir(afn, no->dir);
+            frag.inicio = afn_novo_estado(afn);
+            frag.fim = afn_novo_estado(afn);
+            afn_add_transicao(afn, frag.inicio, esq.inicio, AFN_EPSILON, NULL);
+            afn_add_transicao(afn, frag.inicio, dir.inicio, AFN_EPSILON, NULL);
+            afn_add_transicao(afn, esq.fim, frag.fim, AFN_EPSILON, NULL);
+            afn_add_transicao(afn, dir.fim, frag.fim, AFN_EPSILON, NULL);
+
+            break;
+
+        case REGEX_ESTRELA:
+            esq = thompson_construir(afn, no->esq);
+            frag.inicio = afn_novo_estado(afn);
+            frag.fim = afn_novo_estado(afn);
+            afn_add_transicao(afn, frag.inicio, esq.inicio, AFN_EPSILON, NULL);
+            afn_add_transicao(afn, frag.inicio, frag.fim, AFN_EPSILON, NULL);
+            afn_add_transicao(afn, esq.fim, esq.inicio, AFN_EPSILON, NULL);
+            afn_add_transicao(afn, esq.fim, frag.fim, AFN_EPSILON, NULL);
+
+            break;
+
+        case REGEX_MAIS:
+            esq = thompson_construir(afn, no->esq);
+            frag.inicio = esq.inicio;
+            frag.fim = afn_novo_estado(afn);
+            afn_add_transicao(afn, esq.fim, esq.inicio, AFN_EPSILON, NULL);
+            afn_add_transicao(afn, esq.fim, frag.fim, AFN_EPSILON, NULL);
+
+            break;
+
+        case REGEX_OPCIONAL:
+            esq = thompson_construir(afn, no->esq);
+            frag.inicio = afn_novo_estado(afn);
+            frag.fim = afn_novo_estado(afn);
+            afn_add_transicao(afn, frag.inicio, esq.inicio, AFN_EPSILON, NULL);
+            afn_add_transicao(afn, frag.inicio, frag.fim, AFN_EPSILON, NULL);
+            afn_add_transicao(afn, esq.fim, frag.fim, AFN_EPSILON, NULL);
+            
+            break;
+    }
+    return frag;
+}
+
+typedef struct 
+{
+    unsigned char *bits;
+    int nbytes;
+} ConjuntoEstadosAFN;
+
+static void conjunto_afn_alocar(ConjuntoEstadosAFN *c, int total_estados)
+{
+    c->nbytes = (total_estados + 7) / 8;
+    c->bits = (unsigned char *)calloc((size_t)c->nbytes, 1);
+}
+
+static void conjunto_afn_liberar(ConjuntoEstadosAFN *c)
+{
+    if (c->bits != NULL) 
+    {
+        free(c->bits);
+        c->bits = NULL;
+    }
+}
+
+static void conjunto_afn_adicionar(ConjuntoEstadosAFN *c, int estado)
+{
+    c->bits[estado / 8] |= (unsigned char)(1 << (estado % 8));
+}
+
+static int conjunto_afn_contem(const ConjuntoEstadosAFN *c, int estado)
+{
+    return (c->bits[estado / 8] & (1 << (estado % 8))) != 0;
+}
+
+static int conjunto_afn_igual(const ConjuntoEstadosAFN *a, const ConjuntoEstadosAFN *b)
+{
+    return memcmp(a->bits, b->bits, (size_t)a->nbytes) == 0;
+}
+
+
+static void afn_fecho_epsilon(const GrafoAFN *afn, ConjuntoEstadosAFN *conj)
+{
+    int *pilha;
+    int topo = 0;
+    int i;
+
+    pilha = (int *)malloc((size_t)afn->total_estados * sizeof(int));
+    if (pilha == NULL)
+        return;
+
+    for (i = 0; i < afn->total_estados; i++) 
+        if (conjunto_afn_contem(conj, i)) 
+            pilha[topo++] = i;
+
+    while (topo > 0) 
+    {
+        int u = pilha[--topo];
+        const EstadoAFN *est = &afn->estados[u];
+
+        for (i = 0; i < est->num_transicoes; i++) 
+            if (est->transicoes[i].rotulo == AFN_EPSILON) 
+            {
+                int v = est->transicoes[i].destino;
+
+                if (!conjunto_afn_contem(conj, v)) 
+                {
+                    conjunto_afn_adicionar(conj, v);
+                    pilha[topo++] = v;
+                }
+            }
+    }
+
+    free(pilha);
+}
+
+typedef struct 
+{
+    int transicoes[256];
+    int eh_final;
+} EstadoAFD;
+
+typedef struct 
+{
+    EstadoAFD *estados;
+    int total_estados;
+    int capacidade;
+} GrafoAFD;
+
+static int afd_novo_estado(GrafoAFD *afd, int eh_final)
+{
+    int id;
+    int b;
+
+    if (afd->total_estados >= afd->capacidade) 
+    {
+        int nova_cap = (afd->capacidade == 0) ? 16 : afd->capacidade * 2;
+
+        EstadoAFD *novo = (EstadoAFD *)realloc(afd->estados, (size_t)nova_cap * sizeof(EstadoAFD));
+
+        if (novo == NULL)
+            return -1;
+
+        afd->estados = novo;
+        afd->capacidade = nova_cap;
+    }
+
+    id = afd->total_estados++;
+    afd->estados[id].eh_final = eh_final;
+
+    for (b = 0; b < 256; b++) 
+        afd->estados[id].transicoes[b] = -1;
+    
+    return id;
+}
+
+static GrafoAFD *determinizacao_subconjuntos(const GrafoAFN *afn, int inicio_afn, int fim_afn)
+{
+    GrafoAFD *afd;
+    ConjuntoEstadosAFN *mapa_estados;
+    int cap_mapa = 16;
+    int total_d = 0;
+    int i;
+    int byte_ch;
+
+    afd = (GrafoAFD *)malloc(sizeof(GrafoAFD));
+
+    if (afd == NULL)
+        return NULL;
+
+    afd->estados = NULL;
+    afd->total_estados = 0;
+    afd->capacidade = 0;
+
+    mapa_estados = (ConjuntoEstadosAFN *)malloc((size_t)cap_mapa * sizeof(ConjuntoEstadosAFN));
+    
+    if (mapa_estados == NULL)
+    {
+        free(afd);
+        return NULL;
+    }
+
+    /* Estado inicial do AFD */
+    conjunto_afn_alocar(&mapa_estados[0], afn->total_estados);
+    conjunto_afn_adicionar(&mapa_estados[0], inicio_afn);
+    afn_fecho_epsilon(afn, &mapa_estados[0]);
+
+    afd_novo_estado(afd, conjunto_afn_contem(&mapa_estados[0], fim_afn));
+    total_d = 1;
+
+    /* Itera sobre cada estado do AFD criado */
+    for (i = 0; i < total_d; i++) 
+    {
+        for (byte_ch = 0; byte_ch < 256; byte_ch++) 
+        {
+            ConjuntoEstadosAFN delta;
+            int u;
+            int tem_transicao = 0;
+            int destino_id = -1;
+
+            conjunto_afn_alocar(&delta, afn->total_estados);
+
+            /* Calcula o conjunto alcancado pelo byte atual */
+            for (u = 0; u < afn->total_estados; u++) 
+                if (conjunto_afn_contem(&mapa_estados[i], u)) 
+                {
+                    const EstadoAFN *est = &afn->estados[u];
+                    int t;
+
+                    for (t = 0; t < est->num_transicoes; t++) 
+                        if (est->transicoes[t].rotulo != AFN_EPSILON) 
+                            if (conj_contem(&est->transicoes[t].conjunto, (unsigned char)byte_ch)) 
+                            {
+                                conjunto_afn_adicionar(&delta, est->transicoes[t].destino);
+                                tem_transicao = 1;
+                            }                   
+                }
+            
+
+            if (!tem_transicao) 
+            {
+                conjunto_afn_liberar(&delta);
+                continue;
+            }
+
+            /* Aplica o fecho-epsilon */
+            afn_fecho_epsilon(afn, &delta);
+
+            /* Verifica se esse subconjunto de estados ja foi descoberto */
+            for (u = 0; u < total_d; u++) 
+                if (conjunto_afn_igual(&delta, &mapa_estados[u])) {
+                    destino_id = u;
+                    break;
+                }
+            
+
+            /* Se e um estado novo, regista*/
+            if (destino_id == -1)
+            {
+                if (total_d >= cap_mapa)
+                {
+                    cap_mapa *= 2;
+                    mapa_estados = (ConjuntoEstadosAFN *)realloc(mapa_estados, (size_t)cap_mapa * sizeof(ConjuntoEstadosAFN));
+                }
+
+                mapa_estados[total_d] = delta;
+                destino_id = afd_novo_estado(afd, conjunto_afn_contem(&delta, fim_afn));
+
+                total_d++;
+            } else 
+            {
+                conjunto_afn_liberar(&delta);
+            }
+
+            afd->estados[i].transicoes[byte_ch] = destino_id;
+        }
+    }
+
+    for (i = 0; i < total_d; i++) 
+        conjunto_afn_liberar(&mapa_estados[i]);
+    
+    free(mapa_estados);
+
+    return afd;
+}
+
+
+static void emitir_transicoes_estado(FILE *f, const EstadoAFD *est)
+{
+    int b = 0;
+    int primeiro_ramo = 1;
+
+    while (b < 256) 
+    {
+        int dest = est->transicoes[b];
+        int inicio_faixa;
+        int fim_faixa;
+
+        if (dest == -1) 
+        {
+            b++;
+            continue;
+        }
+
+        inicio_faixa = b;
+        while (b + 1 < 256 && est->transicoes[b + 1] == dest) 
+        {
+            b++;
+        }
+
+        fim_faixa = b;
+
+        if (primeiro_ramo) 
+        {
+            fprintf(f, "            if (");
+            primeiro_ramo = 0;
+        } else 
+        {
+            fprintf(f, "            else if (");
+        }
+
+        if (inicio_faixa == fim_faixa) 
+        {
+            if (inicio_faixa >= 32 && inicio_faixa <= 126 && inicio_faixa != '\'' && inicio_faixa != '\\') 
+            {
+                fprintf(f, "c == '%c'", inicio_faixa);
+            } else 
+            {
+                fprintf(f, "c == %d", inicio_faixa);
+            }
+        } else 
+        {
+            if (inicio_faixa >= 32 && inicio_faixa <= 126 && fim_faixa >= 32 && fim_faixa <= 126 && inicio_faixa != '\'' && fim_faixa != '\'' && inicio_faixa != '\\' && fim_faixa != '\\') 
+            {
+                fprintf(f, "c >= '%c' && c <= '%c'", inicio_faixa, fim_faixa);
+            } else 
+            {
+                fprintf(f, "c >= %d && c <= %d", inicio_faixa, fim_faixa);
+            }
+        }
+
+        fprintf(f, ") {\n");
+        fprintf(f, "                estado = %d;\n", dest);
+        fprintf(f, "            }\n");
+
+        b++;
+    }
+
+    if (!primeiro_ramo) 
+    {
+        fprintf(f, "            else {\n");
+        fprintf(f, "                goto fim;\n");
+        fprintf(f, "            }\n");
+    } else 
+    {
+        /* Estado sem transicoes de saida */
+        fprintf(f, "            goto fim;\n");
+    }
+}
+
+
+static void afd_liberar(GrafoAFD *afd)
+{
+    if (afd != NULL) 
+    {
+        if (afd->estados != NULL) 
+            free(afd->estados);
+        
+        free(afd);
+    }
+}
+
+static void afn_liberar(GrafoAFN *afn)
+{
+    if (afn != NULL && afn->estados != NULL) 
+        free(afn->estados);
+    
+}
+
+
 static int gen_casamento_regex(FILE *f, const char *nome, const char *regex)
 {
-    /* TODO(aluno): converter a expressao regular em automato finito
-     * deterministico (por exemplo: analisar a expressao, construir o AFN
-     * de Thompson e determiniza-lo pela construcao de subconjuntos) e
-     * emitir o automato como codigo C: um switch sobre o estado, com as
-     * transicoes por faixas de caracteres, guardando a ultima posicao em
-     * que o automato passou por um estado final. Subconjunto minimo:
-     * concatenacao, |, *, +, ?, parenteses, classes [a-z] e [^...], o
-     * ponto e escapes como \n, \t, \\ e \/.
-     *
-     * O stub abaixo nao reconhece nada. */
-    fprintf(f, "static size_t %s(const char *s)\n{\n", nome);
-    fputs("    /* TODO(aluno): automato para ", f);
-    emitir_comentario(f, regex);
-    fputs(" */\n    (void) s;\n    return 0;\n}\n\n", f);
+    /* DONE(aluno): converter a expressao regular em automato finito
+    * deterministico (por exemplo: analisar a expressao, construir o AFN
+    * de Thompson e determiniza-lo pela construcao de subconjuntos) e
+    * emitir o automato como codigo C: um switch sobre o estado, com as
+    * transicoes por faixas de caracteres, guardando a ultima posicao em
+    * que o automato passou por um estado final. Subconjunto minimo:
+    * concatenacao, |, *, +, ?, parenteses, classes [a-z] e [^...], o
+    * ponto e escapes como \n, \t, \\ e \/. */
+
+
+    NoRegex *raiz;
+    GrafoAFN afn;
+    FragmentoAFN frag;
+    GrafoAFD *afd;
+    int est;
+
+    raiz = compilar_arvore_regex(regex);
+    if (raiz == NULL) 
+    {
+        /* Regex sintaticamente invalida */
+        return -1;
+    }
+
+    /* Construcao de Thompson */
+    afn.estados = NULL;
+    afn.total_estados = 0;
+    afn.capacidade = 0;
+    frag = thompson_construir(&afn, raiz);
+    liberar_arvore_regex(raiz);
+
+    if (frag.inicio == -1) 
+    {
+        afn_liberar(&afn);
+        return -1;
+    }
+
+    /* AFN -> AFD) */
+    afd = determinizacao_subconjuntos(&afn, frag.inicio, frag.fim);
+    afn_liberar(&afn);
+
+    if (afd == NULL) 
+        return -1;
+
+    fprintf(f, "static size_t %s(const char *s)\n", nome);
+    fprintf(f, "{\n");
+    fprintf(f, "    size_t pos = 0;\n");
+    fprintf(f, "    size_t melhor = 0;\n");
+    fprintf(f, "    int estado = 0;\n");
+    fprintf(f, "    unsigned char c;\n\n");
+
+    /* cadeia vazia aceita imediatamente se estado 0 for final */
+    if (afd->estados[0].eh_final) 
+        fprintf(f, "    melhor = 0;\n");
+    
+
+    fprintf(f, "    while (s[pos] != '\\0') {\n");
+    fprintf(f, "        c = (unsigned char)s[pos];\n");
+    fprintf(f, "        switch (estado) {\n");
+
+    for (est = 0; est < afd->total_estados; est++) 
+    {
+        fprintf(f, "        case %d:\n", est);
+        emitir_transicoes_estado(f, &afd->estados[est]);
+        fprintf(f, "            break;\n");
+    }
+
+    fprintf(f, "        default:\n");
+    fprintf(f, "            goto fim;\n");
+    fprintf(f, "        }\n\n");
+
+    fprintf(f, "        pos++;\n");
+
+    /* Verificacao de aceitacao apos transitar */
+    fprintf(f, "        switch (estado) {\n");
+
+    for (est = 0; est < afd->total_estados; est++) 
+        if (afd->estados[est].eh_final) 
+            fprintf(f, "        case %d:\n", est);
+        
+    
+    fprintf(f, "            melhor = pos;\n");
+    fprintf(f, "            break;\n");
+    fprintf(f, "        default:\n");
+    fprintf(f, "            break;\n");
+    fprintf(f, "        }\n");
+
+    fprintf(f, "    }\n\n");
+    fprintf(f, "fim:\n");
+    fprintf(f, "    return melhor;\n");
+    fprintf(f, "}\n\n");
+
+    afd_liberar(afd);
+
     return 0;
 }
+
+
 
 /* ------------------------------------------------------------------ */
 /* Leitura do arquivo de tokens (opcao --tokens do analisador gerado) */
