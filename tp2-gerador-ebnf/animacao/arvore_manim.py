@@ -260,6 +260,7 @@ def construir_cena(raiz: NoArvore, qualidade: str = "media"):
 def renderizar(raiz: NoArvore, destino: Path, qualidade: str = "media") -> tuple[Path, Path]:
     """Renderiza GIF e PNG usando a API do Manim, sem alterar o parser C."""
     m = _manim()
+    destino = destino.expanduser().resolve()
     destino.mkdir(parents=True, exist_ok=True)
     gif = destino / "arvore.gif"
     png = destino / "arvore.png"
@@ -303,6 +304,18 @@ def ler_arvore_arquivo(caminho: Path) -> NoArvore:
     return ler_arvore(dados.decode("utf-8-sig"))
 
 
+def resumo_artefatos(destino: Path, gif: Path, png: Path, arvore: Path) -> str:
+    """Formata os caminhos absolutos dos arquivos produzidos pela animação."""
+    return "\n".join(
+        (
+            f"Diretório da animação: {destino.expanduser().resolve()}",
+            f"GIF: {gif.expanduser().resolve()}",
+            f"PNG: {png.expanduser().resolve()}",
+            f"Árvore textual: {arvore.expanduser().resolve()}",
+        )
+    )
+
+
 def _arvore_de_arquivo() -> NoArvore:
     """Entrada para ``manim animacao/arvore_manim.py ArvoreDerivacao``."""
     caminho = os.environ.get("ARVORE_TXT")
@@ -328,17 +341,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--qualidade", choices=("baixa", "media", "alta"), default="media")
     args = parser.parse_args(argv)
     try:
+        destino = args.saida.expanduser().resolve()
         texto = executar_parser(args.parser, args.entrada)
         raiz = ler_arvore(texto)
-        args.saida.mkdir(parents=True, exist_ok=True)
-        (args.saida / "arvore.txt").write_text(texto, encoding="utf-8")
-        gif, png = renderizar(raiz, args.saida, args.qualidade)
+        destino.mkdir(parents=True, exist_ok=True)
+        arvore = destino / "arvore.txt"
+        arvore.write_text(texto, encoding="utf-8")
+        gif, png = renderizar(raiz, destino, args.qualidade)
     except ErroArvore as exc:
         print(f"erro: {exc}", file=sys.stderr)
         return 2
-    print(f"GIF: {gif}")
-    print(f"PNG: {png}")
-    print(f"Árvore textual: {args.saida / 'arvore.txt'}")
+    print(resumo_artefatos(destino, gif, png, arvore))
     return 0
 
 

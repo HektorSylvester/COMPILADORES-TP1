@@ -16,11 +16,22 @@ Execute os comandos a partir de `tp2-gerador-ebnf/`:
 Set-Location .\tp2-gerador-ebnf
 ```
 
-No Linux/WSL, use `cd tp2-gerador-ebnf`. O projeto precisa de GCC; os alvos
-`make`, `test` e `microc` também precisam de GNU Make e de um shell POSIX.
+No Linux/WSL, use `cd tp2-gerador-ebnf`. O projeto precisa de um compilador C;
+os alvos `make`, `test` e `microc` também precisam de GNU Make e de um shell POSIX.
 No Windows, execute esses alvos pelo WSL ou por um ambiente equivalente. O
 gerador e os analisadores gerados podem ser compilados diretamente com GCC no
 PowerShell.
+
+No macOS, instale as ferramentas de linha de comando do Xcode para obter
+`clang`, `make` e `sh`:
+
+```sh
+xcode-select --install
+```
+
+Depois, use `make CC=clang` e `python3`. As dependências nativas adicionais do
+Manim devem ser instaladas conforme a documentação do Manim Community para a
+versão do macOS utilizada.
 
 ## Compilar e executar
 
@@ -50,6 +61,15 @@ gcc -ansi -pedantic -Wall -Wextra -o build/expr build/expr.c
 ./build/expr testes/programas/expr/aceito_1.txt
 ```
 
+No macOS, o fluxo é equivalente ao Linux e normalmente usa Clang:
+
+```sh
+make CC=clang
+./gerador testes/gramaticas/expr.ebnf -o build/expr
+clang -ansi -pedantic -Wall -Wextra -o build/expr build/expr.c
+./build/expr testes/programas/expr/aceito_1.txt
+```
+
 O gerador aceita as opções `--scanner microc`, `--sets`, `--tree`, `--ast`,
 `--recover`, `--auto-conflicts` e `--debug`:
 
@@ -60,8 +80,8 @@ gerador gramatica.ebnf -o saida/parser [opções]
 As opções `--tree`, `--ast` e `--recover` também podem ser passadas ao
 analisador gerado. Para ler tokens já preparados, use
 `parser --tokens tokens.txt`. Todo o código C deve compilar sem avisos com
-`gcc -ansi -pedantic -Wall -Wextra`; a única exceção é o `lex.yy.c` gerado
-pelo Flex.
+`gcc`/`clang -ansi -pedantic -Wall -Wextra`; a única exceção é o `lex.yy.c`
+gerado pelo Flex.
 
 ## Estado atual
 
@@ -128,9 +148,21 @@ python -m pip install manim
 python animacao\arvore_manim.py --parser build\expr.exe --entrada testes\programas\expr\aceito_1.txt --saida build\animacao\expr
 ```
 
+No macOS, use `python3`, barras normais e o analisador sem `.exe`:
+
+```sh
+python3 -m pip install manim
+python3 animacao/arvore_manim.py \
+  --parser build/expr \
+  --entrada testes/programas/expr/aceito_1.txt \
+  --saida build/animacao/expr
+```
+
 O analisador precisa ter sido gerado com `--tree` e compilado previamente. As
 instruções completas, incluindo o comando direto `manim ... ArvoreDerivacao`,
-estão em `tp2-gerador-ebnf/animacao/README.md`.
+estão em `tp2-gerador-ebnf/animacao/README.md`. Ao terminar, a CLI mostra o
+diretório absoluto e os caminhos do GIF, do PNG e da árvore textual. Para abrir
+esse diretório no Finder, use `open build/animacao/expr`.
 
 ## Pontuação extra
 

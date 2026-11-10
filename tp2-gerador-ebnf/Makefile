@@ -7,7 +7,10 @@
 #   make test-extras executa os testes dos recursos de pontuacao extra
 #   make clean      remove os arquivos gerados
 
-CC      = gcc
+# Use the platform C compiler by default. Override with "make CC=gcc" or
+# "make CC=clang" when a specific compiler is required.
+CC      ?= cc
+PYTHON  ?= python3
 CFLAGS  = -ansi -pedantic -Wall -Wextra -g
 # O lex.yy.c gerado pelo flex e a unica excecao a regra de "sem avisos".
 CFLAGS_FLEX = -g -w
@@ -59,7 +62,7 @@ test: gerador
 	sh testes/executar.sh
 
 test-extras:
-	python -m unittest testes/test_extras.py -v
+	$(PYTHON) -m unittest testes/test_extras.py -v
 
 clean:
 	rm -rf build gerador

@@ -1,6 +1,8 @@
+import io
 import subprocess
 import sys
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,7 +15,9 @@ from arvore_manim import (
     executar_parser,
     ler_arvore,
     ler_arvore_arquivo,
+    main,
     nos_em_ordem,
+    resumo_artefatos,
 )
 
 
@@ -65,6 +69,49 @@ class TestArvore(unittest.TestCase):
     def test_dimensoes_da_cena_sao_16_por_9(self):
         largura, altura = _dimensoes_cena(ler_arvore(EXEMPLO))
         self.assertAlmostEqual(largura / altura, 16 / 9)
+
+    def test_resumo_mostra_diretorio_absoluto_dos_artefatos(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            destino = Path(tmp) / "animacao"
+            resumo = resumo_artefatos(
+                destino,
+                destino / "arvore.gif",
+                destino / "arvore.png",
+                destino / "arvore.txt",
+            )
+        self.assertIn(f"Diretório da animação: {destino.resolve()}", resumo)
+        self.assertIn(f"GIF: {(destino / 'arvore.gif').resolve()}", resumo)
+        self.assertIn(f"PNG: {(destino / 'arvore.png').resolve()}", resumo)
+        self.assertIn(
+            f"Árvore textual: {(destino / 'arvore.txt').resolve()}",
+            resumo,
+        )
+
+    def test_cli_mostra_diretorio_absoluto_da_animacao(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            destino = Path(tmp) / "animacao"
+            gif = destino / "arvore.gif"
+            png = destino / "arvore.png"
+            with patch("arvore_manim.executar_parser", return_value=EXEMPLO):
+                with patch("arvore_manim.renderizar", return_value=(gif, png)):
+                    saida = io.StringIO()
+                    with redirect_stdout(saida):
+                        codigo = main(
+                            [
+                                "--parser",
+                                str(Path(tmp) / "parser"),
+                                "--entrada",
+                                str(Path(tmp) / "entrada.txt"),
+                                "--saida",
+                                str(destino),
+                            ]
+                        )
+        self.assertEqual(codigo, 0)
+        self.assertIn(f"Diretório da animação: {destino.resolve()}", saida.getvalue())
 
     def test_executa_parser_sem_shell(self):
         with patch("arvore_manim.subprocess.run") as run:

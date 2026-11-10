@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import sys
@@ -8,9 +9,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 GRAMATICAS = ROOT / "testes" / "gramaticas"
+COMPILADOR = os.environ.get("CC") or shutil.which("cc") or shutil.which("gcc")
 
 
-@unittest.skipUnless(shutil.which("gcc"), "GCC e necessario para os testes")
+@unittest.skipUnless(COMPILADOR, "um compilador C e necessario para os testes")
 class TestExtras(unittest.TestCase):
     def compilar_gerador(self, diretorio):
         executavel = diretorio / (
@@ -19,7 +21,7 @@ class TestExtras(unittest.TestCase):
         fontes = sorted((ROOT / "src").glob("*.c"))
         subprocess.run(
             [
-                "gcc",
+                COMPILADOR,
                 "-ansi",
                 "-pedantic",
                 "-Wall",
@@ -48,7 +50,7 @@ class TestExtras(unittest.TestCase):
         )
         subprocess.run(
             [
-                "gcc",
+                COMPILADOR,
                 "-ansi",
                 "-pedantic",
                 "-Wall",

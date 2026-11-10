@@ -16,8 +16,16 @@ adicional. A animação apenas consome a saída já existente de `--tree`.
 - um analisador gerado com `--tree` e compilado.
 
 No Windows, recomenda-se usar o mesmo ambiente Python para instalar e executar
-o Manim. Em Linux/WSL, siga também as instruções oficiais do Manim Community
-para instalar as bibliotecas nativas e o FFmpeg.
+o Manim. Em Linux/WSL e macOS, siga também as instruções oficiais do Manim
+Community para instalar as bibliotecas nativas e o FFmpeg.
+
+No macOS, instale as ferramentas de linha de comando do Xcode e use `clang`,
+`python3` e o executável gerado sem extensão:
+
+```sh
+xcode-select --install
+python3 -m pip install manim
+```
 
 Instalação do pacote Python:
 
@@ -62,11 +70,37 @@ python3 animacao/arvore_manim.py \
   --qualidade media
 ```
 
+No macOS, use o mesmo formato do Linux/WSL:
+
+```sh
+python3 animacao/arvore_manim.py \
+  --parser build/expr \
+  --entrada testes/programas/expr/aceito_1.txt \
+  --saida build/animacao/expr \
+  --qualidade media
+```
+
 A CLI executa o analisador sem shell, exige que a entrada seja aceita e grava:
 
 - `arvore.txt`: saída textual original de `--tree`;
 - `arvore.gif`: animação da criação dos nós;
 - `arvore.png`: estado final da árvore.
+
+Ao finalizar, a CLI imprime o diretório absoluto e os três caminhos completos,
+por exemplo:
+
+```text
+Diretório da animação: /Users/usuario/projeto/tp2-gerador-ebnf/build/animacao/expr
+GIF: /Users/usuario/projeto/tp2-gerador-ebnf/build/animacao/expr/arvore.gif
+PNG: /Users/usuario/projeto/tp2-gerador-ebnf/build/animacao/expr/arvore.png
+Árvore textual: /Users/usuario/projeto/tp2-gerador-ebnf/build/animacao/expr/arvore.txt
+```
+
+No macOS, abra o diretório no Finder com:
+
+```sh
+open build/animacao/expr
+```
 
 O enquadramento da cena mantém proporção 16:9. A resolução em pixels depende de
 `--qualidade` e do perfil de renderização do Manim.
@@ -87,6 +121,14 @@ manim -pqm --format gif animacao\arvore_manim.py ArvoreDerivacao
 ```
 
 Em Linux/WSL:
+
+```sh
+./build/expr --tree testes/programas/expr/aceito_1.txt > build/animacao/expr/arvore.txt
+ARVORE_TXT="$PWD/build/animacao/expr/arvore.txt" \
+  manim -pqm --format gif animacao/arvore_manim.py ArvoreDerivacao
+```
+
+No macOS, o comando direto também usa a sintaxe POSIX:
 
 ```sh
 ./build/expr --tree testes/programas/expr/aceito_1.txt > build/animacao/expr/arvore.txt
@@ -116,8 +158,15 @@ Os testes não precisam do Manim para validar o parsing da árvore:
 python -m unittest discover -s animacao\testes -v
 ```
 
-O teste de integração com o analisador `expr` usa o GCC quando disponível e
-valida que a saída normal continua sendo `entrada aceita`.
+No macOS/Linux:
+
+```sh
+python3 -m unittest discover -s animacao/testes -v
+```
+
+O teste de integração com o analisador `expr` usa `cc`, `gcc` ou outro
+compilador definido em `CC`, quando disponível, e valida que a saída normal
+continua sendo `entrada aceita`.
 
 ## Limitações
 

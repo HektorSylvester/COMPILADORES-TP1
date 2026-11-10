@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import sys
@@ -11,7 +12,10 @@ sys.path.insert(0, str(ROOT / "animacao"))
 from arvore_manim import executar_parser, ler_arvore, nos_em_ordem
 
 
-@unittest.skipUnless(shutil.which("gcc"), "GCC é necessário para o teste de integração")
+COMPILADOR = os.environ.get("CC") or shutil.which("cc") or shutil.which("gcc")
+
+
+@unittest.skipUnless(COMPILADOR, "um compilador C é necessário para o teste de integração")
 class TestIntegracaoExpr(unittest.TestCase):
     def test_parser_real_continua_aceitando_e_exportando_arvore(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -19,7 +23,7 @@ class TestIntegracaoExpr(unittest.TestCase):
             gerador = tmp / ("gerador.exe" if sys.platform == "win32" else "gerador")
             fontes = sorted((ROOT / "src").glob("*.c"))
             subprocess.run(
-                ["gcc", "-ansi", "-pedantic", "-Wall", "-Wextra",
+                [COMPILADOR, "-ansi", "-pedantic", "-Wall", "-Wextra",
                  "-o", str(gerador), *(str(fonte) for fonte in fontes)],
                 cwd=ROOT, check=True, capture_output=True,
             )
@@ -29,9 +33,9 @@ class TestIntegracaoExpr(unittest.TestCase):
                  "-o", str(prefixo), "--tree"],
                 cwd=ROOT, check=True, capture_output=True,
             )
-            executavel = tmp / "expr.exe"
+            executavel = tmp / ("expr.exe" if sys.platform == "win32" else "expr")
             subprocess.run(
-                ["gcc", "-ansi", "-pedantic", "-Wall", "-Wextra",
+                [COMPILADOR, "-ansi", "-pedantic", "-Wall", "-Wextra",
                  "-o", str(executavel), str(prefixo.with_suffix(".c"))],
                 cwd=ROOT, check=True, capture_output=True,
             )
