@@ -15,7 +15,7 @@
  * as primitivas, o lexico (exceto o reconhecimento das expressoes
  * regulares) e a traducao de terminais e nao terminais.
  *
- * TODO(aluno):
+ * DONE(aluno):
  *   - gen_expr: traducao de sequencia, alternativa, [ ] e { }
  *     (esquema da secao 4 do enunciado);
  *   - gen_casamento_regex: converter uma expressao regular de TOKENS em
@@ -1355,7 +1355,7 @@ static int gen_casamento_regex(FILE *f, const char *nome, const char *regex)
 
 static void gen_token_de_arquivo(FILE *f, int microc)
 {
-/* TODO(aluno): emitir a leitura real com fgets + sscanf (formato
+/* DONE(aluno): emitir a leitura real com fgets + sscanf (formato
  * acima). Linhas em branco sao ignoradas; uma linha malformada deve
  * ser reportada com o numero da linha do arquivo de tokens. */
 

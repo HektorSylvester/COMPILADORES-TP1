@@ -10,7 +10,7 @@
  *
  * Se o seu tokens.h do TP1 usar outros nomes, ajuste a tabela.
  *
- * TODO(aluno): implementar microc_carregar_tokens_h.
+ * DONE(aluno): implementar microc_carregar_tokens_h.
  */
 #include <ctype.h>
 #include <stdio.h>
@@ -54,21 +54,118 @@ static void adicionar_nome(const char *s, size_t n)
     nomes[nnomes++] = xstrndup(s, n);
 }
 
-/* TODO(aluno): abrir o arquivo (ler_arquivo ajuda), localizar a
+/* DONE(aluno): abrir o arquivo (ler_arquivo ajuda), localizar a
  * enumeracao "typedef enum { ... } TokenType;" e chamar adicionar_nome
  * para cada identificador da lista, ignorando comentarios e valores
  * explicitos ("X = 3"). Retorne 0 em caso de sucesso.
  * Enquanto nao implementada, a verificacao dos nomes e pulada. */
+
 int microc_carregar_tokens_h(const char *caminho)
 {
-    static int avisado = 0;
-    (void) adicionar_nome;
-    if (!avisado) {
-        diag_aviso(0, 0, "microc_carregar_tokens_h ainda nao implementado: nomes "
-                   "de %s nao verificados", caminho ? caminho : "tokens.h");
-        avisado = 1;
+    char *texto;
+    char *inicio_enum;
+    char *fim_enum;
+    char *p;
+
+    if (caminho == NULL)
+        return -1;
+
+    texto = ler_arquivo(caminho);
+    if (texto == NULL) 
+    {
+        diag_aviso(0, 0, "nao foi possivel abrir %s", caminho);
+        return -1;
     }
-    return -1;
+
+
+    inicio_enum = strstr(texto, "enum");
+
+    if (inicio_enum != NULL) 
+        inicio_enum = strchr(inicio_enum, '{');
+    
+    if (inicio_enum == NULL) 
+    {
+        free(texto);
+        return -1;
+    }
+
+    inicio_enum++; /* pula '{' */
+
+    fim_enum = strchr(inicio_enum, '}');
+
+    if (fim_enum == NULL) 
+    {
+        free(texto);
+        return -1;
+    }
+
+    p = inicio_enum;
+    while (p < fim_enum)
+     {
+       
+        while (p < fim_enum && (isspace((unsigned char)*p) || *p == ',')) 
+        {
+            p++;
+        }
+
+        /* Ignora comentarios */
+        if (p < fim_enum - 1 && p[0] == '/' && p[1] == '*') 
+        {
+            p += 2;
+            while (p < fim_enum - 1 && !(p[0] == '*' && p[1] == '/')) 
+            {
+                p++;
+            }
+
+            if (p < fim_enum - 1)
+                p += 2;
+            continue;
+        }
+
+        /* Ignora comentarios de linha */
+        if (p < fim_enum - 1 && p[0] == '/' && p[1] == '/') 
+        {
+            while (p < fim_enum && *p != '\n') 
+            {
+                p++;
+            }
+
+            continue;
+        }
+
+        /* Se comeca com caractere de identificador*/
+        if (p < fim_enum && (isalpha((unsigned char)*p) || *p == '_')) 
+        {
+            char *ini_id = p;
+            while (p < fim_enum && (isalnum((unsigned char)*p) || *p == '_'))
+            {
+                p++;
+            }
+            adicionar_nome(ini_id, (size_t)(p - ini_id));
+
+            /* Pula possivel atribuicao de valor numerico ex.: ID = 1 */
+            while (p < fim_enum && isspace((unsigned char)*p)) 
+            {
+                p++;
+            }
+
+            if (p < fim_enum && *p == '=') 
+            {
+                p++;
+                while (p < fim_enum && *p != ',' && *p != '}' && *p != '\n') 
+                {
+                    p++;
+                }
+            }
+        } else 
+        {
+            p++;
+        }
+    }
+
+    free(texto);
+
+    return 0;
 }
 
 int microc_token_existe(const char *nome)

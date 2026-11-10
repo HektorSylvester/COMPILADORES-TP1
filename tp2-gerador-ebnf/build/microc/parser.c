@@ -11,6 +11,14 @@
 
 /* ---- conjuntos de tokens ---- */
 
+static const int conj_0[] = { LBRACE, ID, SEMICOLON, IF, FOR, RETURN, PRINT, -1 };
+static const int conj_1[] = { INT, CHAR, -1 };
+static const int conj_2[] = { LPAREN, ID, INTEGERCONST, CHARCONST, NOT, -1 };
+static const int conj_3[] = { LPAREN, ID, INTEGERCONST, STRINGCONST, CHARCONST, NOT, -1 };
+static const int conj_4[] = { AND, OR, -1 };
+static const int conj_5[] = { EQ, NEQ, LT, GT, LEQ, GEQ, -1 };
+static const int conj_6[] = { PLUS, MINUS, -1 };
+static const int conj_7[] = { MUL, DIV, MOD, -1 };
 
 /* ---- estado do analisador ---- */
 
@@ -153,10 +161,60 @@ void match(int esperado)
 
 static Token token_de_arquivo(void)
 {
+    static int linha_arq = 0;
+    char buf[1024];
     Token t;
+    int tipo_lido;
+    int linha_token;
+    char lex[512];
+
     memset(&t, 0, sizeof t);
-    fprintf(stderr, "opcao --tokens ainda nao implementada\n");
-    exit(EXIT_FAILURE);
+
+    while (fgets(buf, sizeof buf, arquivo_tokens) != NULL) {
+        char *p = buf;
+        linha_arq++;
+
+        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') {
+            p++;
+        }
+        if (*p == '\0') {
+            continue;
+        }
+
+        lex[0] = '\0';
+        if (sscanf(p, "Token: tipo = %d, lexema = '%[^']', linha = %d",
+                   &tipo_lido, lex, &linha_token) == 3) {
+            t.tipo = tipo_lido;
+            t.linha = (size_t)linha_token;
+            t.tamanho = strlen(lex);
+            t.lexema = (char *)malloc(t.tamanho + 1);
+            if (t.lexema != NULL) {
+                strcpy(t.lexema, lex);
+            }
+            return t;
+        }
+
+        if (sscanf(p, "Token: tipo = %d, lexema = '', linha = %d",
+                   &tipo_lido, &linha_token) == 2) {
+            t.tipo = tipo_lido;
+            t.linha = (size_t)linha_token;
+            t.tamanho = 0;
+            t.lexema = (char *)malloc(1);
+            if (t.lexema != NULL) {
+                t.lexema[0] = '\0';
+            }
+            return t;
+        }
+
+        fprintf(stderr, "linha %d do arquivo de tokens malformada: %s\n",
+                linha_arq, buf);
+        exit(EXIT_FAILURE);
+    }
+
+    t.tipo = TOKEN_FIM;
+    t.linha = (size_t)linha_arq;
+    t.lexema = "";
+    t.tamanho = 0;
     return t;
 }
 
@@ -166,7 +224,11 @@ static Token token_de_arquivo(void)
 void parse_programa(void)
 {
     arvore_entra("programa");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(INT);
+    match(MAIN);
+    match(LPAREN);
+    match(RPAREN);
+    parse_bloco();
     arvore_sai();
 }
 
@@ -174,7 +236,14 @@ void parse_programa(void)
 void parse_bloco(void)
 {
     arvore_entra("bloco");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(LBRACE);
+    while (tok.tipo == INT || tok.tipo == CHAR) {
+        parse_declaracao();
+    }
+    while (pertence(tok.tipo, conj_0)) {
+        parse_comando();
+    }
+    match(RBRACE);
     arvore_sai();
 }
 
@@ -182,7 +251,14 @@ void parse_bloco(void)
 void parse_declaracao(void)
 {
     arvore_entra("declaracao");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_tipo();
+    match(ID);
+    if (tok.tipo == LBRACKET) {
+        match(LBRACKET);
+        match(INTEGERCONST);
+        match(RBRACKET);
+    }
+    match(SEMICOLON);
     arvore_sai();
 }
 
@@ -190,7 +266,23 @@ void parse_declaracao(void)
 void parse_comando(void)
 {
     arvore_entra("comando");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    if (tok.tipo == IF) {
+        parse_comando_if();
+    } else if (tok.tipo == FOR) {
+        parse_comando_for();
+    } else if (tok.tipo == ID) {
+        parse_atribuicao();
+    } else if (tok.tipo == RETURN) {
+        parse_comando_return();
+    } else if (tok.tipo == PRINT) {
+        parse_comando_print();
+    } else if (tok.tipo == LBRACE) {
+        parse_bloco();
+    } else if (tok.tipo == SEMICOLON) {
+        match(SEMICOLON);
+    } else {
+        erro_sintatico(conj_0);
+    }
     arvore_sai();
 }
 
@@ -198,7 +290,13 @@ void parse_comando(void)
 void parse_tipo(void)
 {
     arvore_entra("tipo");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    if (tok.tipo == INT) {
+        match(INT);
+    } else if (tok.tipo == CHAR) {
+        match(CHAR);
+    } else {
+        erro_sintatico(conj_1);
+    }
     arvore_sai();
 }
 
@@ -206,7 +304,15 @@ void parse_tipo(void)
 void parse_comando_if(void)
 {
     arvore_entra("comando_if");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(IF);
+    match(LPAREN);
+    parse_expressao();
+    match(RPAREN);
+    parse_comando();
+    if (tok.tipo == ELSE) {
+        match(ELSE);
+        parse_comando();
+    }
     arvore_sai();
 }
 
@@ -214,7 +320,15 @@ void parse_comando_if(void)
 void parse_comando_for(void)
 {
     arvore_entra("comando_for");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(FOR);
+    match(LPAREN);
+    parse_atribuicao_interna();
+    match(SEMICOLON);
+    parse_expressao();
+    match(SEMICOLON);
+    parse_atribuicao_interna();
+    match(RPAREN);
+    parse_comando();
     arvore_sai();
 }
 
@@ -222,7 +336,8 @@ void parse_comando_for(void)
 void parse_atribuicao(void)
 {
     arvore_entra("atribuicao");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_atribuicao_interna();
+    match(SEMICOLON);
     arvore_sai();
 }
 
@@ -230,7 +345,11 @@ void parse_atribuicao(void)
 void parse_comando_return(void)
 {
     arvore_entra("comando_return");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(RETURN);
+    if (pertence(tok.tipo, conj_2)) {
+        parse_expressao();
+    }
+    match(SEMICOLON);
     arvore_sai();
 }
 
@@ -238,7 +357,11 @@ void parse_comando_return(void)
 void parse_comando_print(void)
 {
     arvore_entra("comando_print");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(PRINT);
+    match(LPAREN);
+    parse_conteudo_print();
+    match(RPAREN);
+    match(SEMICOLON);
     arvore_sai();
 }
 
@@ -254,7 +377,14 @@ void parse_expressao(void)
 void parse_atribuicao_interna(void)
 {
     arvore_entra("atribuicao_interna");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    match(ID);
+    if (tok.tipo == LBRACKET) {
+        match(LBRACKET);
+        parse_expressao();
+        match(RBRACKET);
+    }
+    match(ASSIGN);
+    parse_expressao();
     arvore_sai();
 }
 
@@ -262,7 +392,13 @@ void parse_atribuicao_interna(void)
 void parse_conteudo_print(void)
 {
     arvore_entra("conteudo_print");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    if (tok.tipo == STRINGCONST) {
+        match(STRINGCONST);
+    } else if (pertence(tok.tipo, conj_2)) {
+        parse_expressao();
+    } else {
+        erro_sintatico(conj_3);
+    }
     arvore_sai();
 }
 
@@ -270,7 +406,17 @@ void parse_conteudo_print(void)
 void parse_expressao_logica(void)
 {
     arvore_entra("expressao_logica");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_expressao_relacional();
+    while (tok.tipo == AND || tok.tipo == OR) {
+        if (tok.tipo == AND) {
+            match(AND);
+        } else if (tok.tipo == OR) {
+            match(OR);
+        } else {
+            erro_sintatico(conj_4);
+        }
+        parse_expressao_relacional();
+    }
     arvore_sai();
 }
 
@@ -278,7 +424,11 @@ void parse_expressao_logica(void)
 void parse_expressao_relacional(void)
 {
     arvore_entra("expressao_relacional");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_expressao_aritmetica();
+    if (pertence(tok.tipo, conj_5)) {
+        parse_operador_relacional();
+        parse_expressao_aritmetica();
+    }
     arvore_sai();
 }
 
@@ -286,7 +436,17 @@ void parse_expressao_relacional(void)
 void parse_expressao_aritmetica(void)
 {
     arvore_entra("expressao_aritmetica");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_termo();
+    while (tok.tipo == PLUS || tok.tipo == MINUS) {
+        if (tok.tipo == PLUS) {
+            match(PLUS);
+        } else if (tok.tipo == MINUS) {
+            match(MINUS);
+        } else {
+            erro_sintatico(conj_6);
+        }
+        parse_termo();
+    }
     arvore_sai();
 }
 
@@ -294,7 +454,21 @@ void parse_expressao_aritmetica(void)
 void parse_operador_relacional(void)
 {
     arvore_entra("operador_relacional");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    if (tok.tipo == EQ) {
+        match(EQ);
+    } else if (tok.tipo == NEQ) {
+        match(NEQ);
+    } else if (tok.tipo == LT) {
+        match(LT);
+    } else if (tok.tipo == GT) {
+        match(GT);
+    } else if (tok.tipo == LEQ) {
+        match(LEQ);
+    } else if (tok.tipo == GEQ) {
+        match(GEQ);
+    } else {
+        erro_sintatico(conj_5);
+    }
     arvore_sai();
 }
 
@@ -302,7 +476,19 @@ void parse_operador_relacional(void)
 void parse_termo(void)
 {
     arvore_entra("termo");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    parse_fator();
+    while (tok.tipo == MUL || tok.tipo == DIV || tok.tipo == MOD) {
+        if (tok.tipo == MUL) {
+            match(MUL);
+        } else if (tok.tipo == DIV) {
+            match(DIV);
+        } else if (tok.tipo == MOD) {
+            match(MOD);
+        } else {
+            erro_sintatico(conj_7);
+        }
+        parse_fator();
+    }
     arvore_sai();
 }
 
@@ -310,7 +496,27 @@ void parse_termo(void)
 void parse_fator(void)
 {
     arvore_entra("fator");
-    /* TODO(aluno): construcao ainda nao traduzida */
+    if (tok.tipo == LPAREN) {
+        match(LPAREN);
+        parse_expressao();
+        match(RPAREN);
+    } else if (tok.tipo == ID) {
+        match(ID);
+        if (tok.tipo == LBRACKET) {
+            match(LBRACKET);
+            parse_expressao();
+            match(RBRACKET);
+        }
+    } else if (tok.tipo == INTEGERCONST) {
+        match(INTEGERCONST);
+    } else if (tok.tipo == CHARCONST) {
+        match(CHARCONST);
+    } else if (tok.tipo == NOT) {
+        match(NOT);
+        parse_fator();
+    } else {
+        erro_sintatico(conj_2);
+    }
     arvore_sai();
 }
 

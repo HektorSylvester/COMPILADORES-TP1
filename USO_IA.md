@@ -39,5 +39,15 @@ Modelo de entrada:
 
     Ferramenta: Gemini (Google)
     Trecho:     codegen.c 
-    Finalidade: Precisei de ajuda (e de uma intervenção divina) na implementação do AFN (eu já cometi todos os erros de sintaxe imagináveis à esse ponto), além disso o chat me sugeriu funções auxiliares que poderiam "descomplicar" as funções iniciais que eu havia planejado. 
+    Finalidade: Precisei de ajuda (e quase que de uma intervenção divina kkk) na implementação do AFN (eu já cometi todos os erros de sintaxe imagináveis à esse ponto), além disso o chat me sugeriu funções auxiliares que poderiam "descomplicar" as funções iniciais que eu havia planejado. 
     O que fiz: Adaptado.
+
+    Ferramenta: Gemini (Google)
+    Trecho:     microc_mapa.c 
+    Finalidade: Auxílio na compreensão das funções usadas nesse arquivo, mas que estavam em 'util.h'. 
+    O que fiz:  Consultado.
+
+    Ferramenta: Gemini (Google)
+    Trecho:     microc_mapa.c 
+    Finalidade: Ajuda na verificação de se deixei passar algum identificador da lista. 
+    O que fiz:  Adaptado.
