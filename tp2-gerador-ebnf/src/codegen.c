@@ -1351,25 +1351,74 @@ static int gen_casamento_regex(FILE *f, const char *nome, const char *regex)
  *   Token: tipo = <numero>, lexema = '<texto>', linha = <numero>
  *
  * Ao chegar ao fim do arquivo devolve um token TOKEN_FIM. */
+
+
 static void gen_token_de_arquivo(FILE *f, int microc)
 {
-    /* TODO(aluno): emitir a leitura real com fgets + sscanf (formato
-     * acima). Linhas em branco sao ignoradas; uma linha malformada deve
-     * ser reportada com o numero da linha do arquivo de tokens. */
-    static const char *const linhas[] = {
-        "static Token token_de_arquivo(void)",
-        "{",
-        "    Token t;",
-        "    memset(&t, 0, sizeof t);",
-        "    fprintf(stderr, \"opcao --tokens ainda nao implementada\\n\");",
-        "    exit(EXIT_FAILURE);",
-        "    return t;",
-        "}",
-        "",
-        NULL
-    };
+/* TODO(aluno): emitir a leitura real com fgets + sscanf (formato
+ * acima). Linhas em branco sao ignoradas; uma linha malformada deve
+ * ser reportada com o numero da linha do arquivo de tokens. */
+
     (void) microc;
-    emit_linhas(f, linhas);
+
+    fprintf(f, "static Token token_de_arquivo(void)\n");
+    fprintf(f, "{\n");
+    fprintf(f, "    static int linha_arq = 0;\n");
+    fprintf(f, "    char buf[1024];\n");
+    fprintf(f, "    Token t;\n");
+    fprintf(f, "    int tipo_lido;\n");
+    fprintf(f, "    int linha_token;\n");
+    fprintf(f, "    char lex[512];\n");
+    fprintf(f, "\n");
+    fprintf(f, "    memset(&t, 0, sizeof t);\n");
+    fprintf(f, "\n");
+    fprintf(f, "    while (fgets(buf, sizeof buf, arquivo_tokens) != NULL) {\n");
+    fprintf(f, "        char *p = buf;\n");
+    fprintf(f, "        linha_arq++;\n");
+    fprintf(f, "\n");
+    fprintf(f, "        while (*p == ' ' || *p == '\\t' || *p == '\\r' || *p == '\\n') {\n");
+    fprintf(f, "            p++;\n");
+    fprintf(f, "        }\n");
+    fprintf(f, "        if (*p == '\\0') {\n");
+    fprintf(f, "            continue;\n");
+    fprintf(f, "        }\n");
+    fprintf(f, "\n");
+    fprintf(f, "        lex[0] = '\\0';\n");
+    fprintf(f, "        if (sscanf(p, \"Token: tipo = %%d, lexema = '%%[^']', linha = %%d\",\n");
+    fprintf(f, "                   &tipo_lido, lex, &linha_token) == 3) {\n");
+    fprintf(f, "            t.tipo = tipo_lido;\n");
+    fprintf(f, "            t.linha = (size_t)linha_token;\n");
+    fprintf(f, "            t.tamanho = strlen(lex);\n");
+    fprintf(f, "            t.lexema = (char *)malloc(t.tamanho + 1);\n");
+    fprintf(f, "            if (t.lexema != NULL) {\n");
+    fprintf(f, "                strcpy(t.lexema, lex);\n");
+    fprintf(f, "            }\n");
+    fprintf(f, "            return t;\n");
+    fprintf(f, "        }\n");
+    fprintf(f, "\n");
+    fprintf(f, "        if (sscanf(p, \"Token: tipo = %%d, lexema = '', linha = %%d\",\n");
+    fprintf(f, "                   &tipo_lido, &linha_token) == 2) {\n");
+    fprintf(f, "            t.tipo = tipo_lido;\n");
+    fprintf(f, "            t.linha = (size_t)linha_token;\n");
+    fprintf(f, "            t.tamanho = 0;\n");
+    fprintf(f, "            t.lexema = (char *)malloc(1);\n");
+    fprintf(f, "            if (t.lexema != NULL) {\n");
+    fprintf(f, "                t.lexema[0] = '\\0';\n");
+    fprintf(f, "            }\n");
+    fprintf(f, "            return t;\n");
+    fprintf(f, "        }\n");
+    fprintf(f, "\n");
+    fprintf(f, "        fprintf(stderr, \"linha %%d do arquivo de tokens malformada: %%s\\n\",\n");
+    fprintf(f, "                linha_arq, buf);\n");
+    fprintf(f, "        exit(EXIT_FAILURE);\n");
+    fprintf(f, "    }\n");
+    fprintf(f, "\n");
+    fprintf(f, "    t.tipo = TOKEN_FIM;\n");
+    fprintf(f, "    t.linha = (size_t)linha_arq;\n");
+    fprintf(f, "    t.lexema = \"\";\n");
+    fprintf(f, "    t.tamanho = 0;\n");
+    fprintf(f, "    return t;\n");
+    fprintf(f, "}\n\n");
 }
 
 /* ------------------------------------------------------------------ */
