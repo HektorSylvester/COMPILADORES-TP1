@@ -1,0 +1,12 @@
+NAO TERMINAL  ANULAVEL  FIRST / FOLLOW
+calc          sim       FIRST  = {ID, 'print'}
+                        FOLLOW = {$}
+comando       nao       FIRST  = {ID, 'print'}
+                        FOLLOW = {$, ID, 'print'}
+expr          nao       FIRST  = {NUM, ID, '('}
+                        FOLLOW = {';', ')'}
+term          nao       FIRST  = {NUM, ID, '('}
+                        FOLLOW = {';', '+', '-', ')'}
+factor        nao       FIRST  = {NUM, ID, '('}
+                        FOLLOW = {';', '+', '-', '*', '/', ')'}
+status 0

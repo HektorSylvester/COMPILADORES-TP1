@@ -1287,10 +1287,10 @@ case 16:
 YY_RULE_SETUP
 #line 228 "microc/microc.flex"
 {
-        linha_atual++;
-        microc_yylval.error_msg = "String nao terminada";
-        return retorna_token(UNDEF);
-    }
+    yyless(yyleng - 1);
+    microc_yylval.error_msg = "String nao terminada";
+    return retorna_token(UNDEF);
+}
 	YY_BREAK
 /* Fim do arquivo antes da aspa de fechamento. */
 case 17:

@@ -289,7 +289,7 @@ static void calcular_expr_follow(Expr *e, Gramatica *g, int *mudou)
             }
             break;
 
-
+        case E_REP: /* <-- ADICIONE ESTA LINHA AQUI */
             for (i = 0; i < e->nfilhos; i++) 
             {
                 if (bitset_unir(&e->filhos[i]->follow, &e->follow)) 

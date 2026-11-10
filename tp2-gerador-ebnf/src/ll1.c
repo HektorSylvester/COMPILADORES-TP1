@@ -136,7 +136,6 @@ static int verificar_expr(const Gramatica *g, int nt, const Expr *e)
 
                 if (!bitset_vazio(&inter)) 
                     reportar(g, nt, e, 1, &inter, "FIRST e FOLLOW de %s se intersectam (resolvido de forma gulosa) em", e->tipo == E_OPC ? "[ ]" : "{ }");
-        
             }
             break;
 

@@ -61,3 +61,8 @@ Modelo de entrada:
     Trecho:     scanner.c, scanner.h e tokens.h 
     Finalidade: Fiz passar em 15 de 17 testes. Precisei de ajuda com os 2 que faltaram.
     O que fiz:  Adaptado.
+
+    Ferramenta: Gemini (Google)
+    Trecho:     calc 
+    Finalidade: Pedi a IA que gerasse mais uma gramática para testar ainda mais a ferramenta, incluí exemplos aceitos e rejeitados.
+    O que fiz:  Completo.
