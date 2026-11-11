@@ -19,11 +19,72 @@ make clean
 
 ```
 ./gerador gramatica.ebnf -o saida/parser [--scanner microc] [--sets] [--tree] [--debug]
-gcc -ansi -pedantic -Wall -Wextra -o parser saida/parser.c
+cc -ansi -pedantic -Wall -Wextra -o parser saida/parser.c
 ./parser [--tree] programa.txt        # ou: ./parser --tokens tokens.txt
 ```
 
 Todo o código deve compilar sem avisos com `gcc -ansi -pedantic -Wall -Wextra`. A única exceção é o `lex.yy.c` gerado pelo flex.
+
+## Execução no macOS
+
+Os comandos abaixo devem ser executados no Terminal, a partir da pasta
+`tp2-gerador-ebnf`. O macOS fornece o compilador `cc` por meio do Apple Clang.
+Caso ainda não tenha as ferramentas de linha de comando instaladas, execute:
+
+```
+xcode-select --install
+```
+
+Para usar outro compilador, informe-o ao `make`:
+
+```
+make CC=clang
+```
+
+### Compilação e testes
+
+```
+cd caminho/para/COMPILADORES-TP1/tp2-gerador-ebnf
+make clean
+make
+chmod +x testes/executar.sh
+./testes/executar.sh
+```
+
+### Instalação do Manim
+
+Instale o Python 3 e o Manim:
+
+```
+python3 -m pip install manim --break-system-packages
+```
+
+O `ccache`, o `ca-certificates` e a biblioteca `fmt` não são dependências
+diretas deste projeto. Se o Homebrew apresentar um erro ao instalar
+dependências do Manim/Pycairo, execute:
+
+```
+brew unlink ca-certificates
+brew link --overwrite ca-certificates
+brew reinstall ccache
+```
+
+### Geração da animação da árvore
+
+Depois de compilar o gerador e instalar o Manim, execute:
+
+```
+mkdir -p build/animacao
+./gerador testes/gramaticas/expr.ebnf -o build/expr --tree
+cc build/expr.c -o build/expr
+python3 animacao/arvore_manim.py \
+  --parser build/expr \
+  --entrada testes/programas/expr/aceito_1.txt \
+  --saida build/animacao/expr
+```
+
+O script executa o analisador com `--tree`, verifica seu código de saída e
+renderiza o vídeo no caminho informado por `--saida`.
 
 ## Estado do código-base
 

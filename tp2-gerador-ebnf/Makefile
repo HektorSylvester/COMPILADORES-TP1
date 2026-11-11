@@ -6,7 +6,7 @@
 #   make test       executa os testes automatizados
 #   make clean      remove os arquivos gerados
 
-CC      = gcc
+CC      ?= cc
 CFLAGS  = -ansi -pedantic -Wall -Wextra -g
 # O lex.yy.c gerado pelo flex e a unica excecao a regra de "sem avisos".
 CFLAGS_FLEX = -g -w

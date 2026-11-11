@@ -16,7 +16,7 @@
 
 GERADOR=./gerador
 SAIDA=build/testes
-CC=${CC:-gcc}
+CC=${CC:-cc}
 CFLAGS=${CFLAGS:-"-ansi -pedantic -Wall -Wextra"}
 
 total=0
