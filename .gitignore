@@ -1,0 +1,13 @@
+# Artefatos de compilação e execução
+tp2-gerador-ebnf/build/
+tp2-gerador-ebnf/media/
+tp2-gerador-ebnf/gerador
+tp2-gerador-ebnf/*.exe
+
+# Caches do Python
+__pycache__/
+*.py[cod]
+
+# Arquivos temporários do sistema e editores
+.DS_Store
+Thumbs.db

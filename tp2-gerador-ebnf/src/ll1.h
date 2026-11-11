@@ -10,4 +10,9 @@
  * conflitos que impedem a geracao (erros). Requer anulavel, FIRST e FOLLOW. */
 int ll1_verificar(const Gramatica *g);
 
+/* Fatora alternativas que compartilham um primeiro terminal ou nao terminal.
+ * Retorna quantos conflitos simples foram corrigidos. Deve ser chamado antes
+ * do calculo de anulavel, FIRST e FOLLOW. */
+int ll1_corrigir_conflitos_simples(Gramatica *g);
+
 #endif

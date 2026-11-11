@@ -1,0 +1,23 @@
+(* Descricao formal da linguagem EBNF aceita pelo proprio gerador.
+ * Comentarios sao descartados pelo meta-lexer e, por isso, ficam fora
+ * da gramatica sintatica abaixo. *)
+TOKENS
+  NOME_TERM = /[A-Z][A-Z0-9_]*/ ;
+  NAOTERM   = /[a-z][A-Za-z0-9_]*/ ;
+  LITERAL   = /"[^"\n]*"|'[^'\n]*'/ ;
+  REGEX     = /\/[^\/\n]*\// ;
+  SKIP      = /[ \t\r\n]+/ ;
+
+RULES
+  gramatica        = [ secao_tokens ] secao_regras ;
+  secao_tokens     = "TOKENS" ( "EXTERN" LITERAL ";"
+                              | { declaracao_token } ) ;
+  declaracao_token = NOME_TERM "=" REGEX ";" | "SKIP" "=" REGEX ";" ;
+  secao_regras     = "RULES" regra { regra } ;
+  regra            = NAOTERM "=" expressao ";" ;
+  expressao        = sequencia { "|" sequencia } ;
+  sequencia        = { fator } ;
+  fator            = NOME_TERM | NAOTERM | LITERAL
+                   | "(" expressao ")"
+                   | "[" expressao "]"
+                   | "{" expressao "}" ;

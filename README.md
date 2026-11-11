@@ -8,104 +8,90 @@ Código-base do gerador. Ele lê uma gramática em EBNF e gera, em ANSI C, um an
 
 As duas primeiras linhas deste arquivo seguem o formato do TP1: uma linha `aluno:` por integrante e a linha `uso_ia:` logo abaixo. Registre o uso de IA em `USO_IA.md`.
 
-## Compilar e executar
+## Pré-requisitos e diretório de trabalho
 
-```
-make                      # compila o gerador (e o analisador de Micro C, se o TP1 estiver em microc/)
-make test                 # executa os testes de testes/
-make microc               # gera e compila build/microc/parser_microc
-make clean
-```
+Execute os comandos a partir de `tp2-gerador-ebnf/`:
 
-```
-./gerador gramatica.ebnf -o saida/parser [--scanner microc] [--sets] [--tree] [--debug]
-cc -ansi -pedantic -Wall -Wextra -o parser saida/parser.c
-./parser [--tree] programa.txt        # ou: ./parser --tokens tokens.txt
+```powershell
+Set-Location .\tp2-gerador-ebnf
 ```
 
-Todo o código deve compilar sem avisos com `gcc -ansi -pedantic -Wall -Wextra`. A única exceção é o `lex.yy.c` gerado pelo flex.
+No Linux/WSL, use `cd tp2-gerador-ebnf`. O projeto precisa de um compilador C;
+os alvos `make`, `test` e `microc` também precisam de GNU Make e de um shell POSIX.
+No Windows, execute esses alvos pelo WSL ou por um ambiente equivalente. O
+gerador e os analisadores gerados podem ser compilados diretamente com GCC no
+PowerShell.
 
-## Execução no macOS
+No macOS, instale as ferramentas de linha de comando do Xcode para obter
+`clang`, `make` e `sh`:
 
-Os comandos abaixo devem ser executados no Terminal, a partir da pasta
-`tp2-gerador-ebnf`. O macOS fornece o compilador `cc` por meio do Apple Clang.
-Caso ainda não tenha as ferramentas de linha de comando instaladas, execute:
-
-```
+```sh
 xcode-select --install
 ```
 
-Para usar outro compilador, informe-o ao `make`:
+Depois, use `make CC=clang` e `python3`. As dependências nativas adicionais do
+Manim devem ser instaladas conforme a documentação do Manim Community para a
+versão do macOS utilizada.
 
+## Compilar e executar
+
+O fluxo completo pelo Makefile é:
+
+```sh
+make                      # compila o gerador e, se disponível, o analisador Micro C
+make test                 # executa os testes oficiais
+make test-extras          # executa os testes dos recursos de pontuação extra
+make microc               # gera e compila build/microc/parser_microc
+make clean                # remove gerador e build/
 ```
+
+Para gerar e executar uma gramática manualmente no PowerShell:
+
+```powershell
+.\gerador.exe testes\gramaticas\expr.ebnf -o build\expr
+gcc -ansi -pedantic -Wall -Wextra -o build\expr.exe build\expr.c
+.\build\expr.exe testes\programas\expr\aceito_1.txt
+```
+
+No Linux/WSL, use o executável sem `.exe` e barras normais:
+
+```sh
+./gerador testes/gramaticas/expr.ebnf -o build/expr
+gcc -ansi -pedantic -Wall -Wextra -o build/expr build/expr.c
+./build/expr testes/programas/expr/aceito_1.txt
+```
+
+No macOS, o fluxo é equivalente ao Linux e normalmente usa Clang:
+
+```sh
 make CC=clang
+./gerador testes/gramaticas/expr.ebnf -o build/expr
+clang -ansi -pedantic -Wall -Wextra -o build/expr build/expr.c
+./build/expr testes/programas/expr/aceito_1.txt
 ```
 
-### Compilação e testes
+O gerador aceita as opções `--scanner microc`, `--sets`, `--tree`, `--ast`,
+`--recover`, `--auto-conflicts` e `--debug`:
 
-```
-cd caminho/para/COMPILADORES-TP1/tp2-gerador-ebnf
-make clean
-make
-chmod +x testes/executar.sh
-./testes/executar.sh
+```text
+gerador gramatica.ebnf -o saida/parser [opções]
 ```
 
-### Instalação do Manim
+As opções `--tree`, `--ast` e `--recover` também podem ser passadas ao
+analisador gerado. Para ler tokens já preparados, use
+`parser --tokens tokens.txt`. Todo o código C deve compilar sem avisos com
+`gcc`/`clang -ansi -pedantic -Wall -Wextra`; a única exceção é o `lex.yy.c`
+gerado pelo Flex.
 
-Instale o Python 3 e o Manim:
+## Estado atual
 
-```
-python3 -m pip install manim --break-system-packages
-```
+O gerador implementa as etapas de leitura da EBNF, verificação semântica,
+cálculo de conjuntos, validação LL(1), geração do analisador e integração
+opcional com o scanner de Micro C. Os quatro recursos de pontuação extra
+estão descritos na seção correspondente abaixo.
 
-O `ccache`, o `ca-certificates` e a biblioteca `fmt` não são dependências
-diretas deste projeto. Se o Homebrew apresentar um erro ao instalar
-dependências do Manim/Pycairo, execute:
-
-```
-brew unlink ca-certificates
-brew link --overwrite ca-certificates
-brew reinstall ccache
-```
-
-### Geração da animação da árvore
-
-Depois de compilar o gerador e instalar o Manim, execute:
-
-```
-mkdir -p build/animacao
-./gerador testes/gramaticas/expr.ebnf -o build/expr --tree
-cc build/expr.c -o build/expr
-python3 animacao/arvore_manim.py \
-  --parser build/expr \
-  --entrada testes/programas/expr/aceito_1.txt \
-  --saida build/animacao/expr
-```
-
-O script executa o analisador com `--tree`, verifica seu código de saída e
-renderiza o vídeo no caminho informado por `--saida`.
-
-## Estado do código-base
-
-O esqueleto compila, executa de ponta a ponta e gera um analisador que compila, mas que ainda não reconhece nada. Os pontos a implementar estão marcados com `TODO(aluno)`:
-
-```
-grep -rn "TODO(aluno)" src microc
-```
-
-| Etapa | Arquivo | Fornecido | A implementar |
-| --- | --- | --- | --- |
-| 1. Leitura da EBNF | `ebnf_lexer.c`, `ebnf_parser.c` | léxico da notação; seções TOKENS e RULES; recuperação de erros | `parse_expr`, `parse_seq`, `parse_fator` |
-| 2. Verificação semântica | `verificacao.c` | indefinidos, terminais não declarados, duplicados | inalcançáveis, improdutivos, recursão à esquerda |
-| 3. Conjuntos | `conjuntos.c` | alocação e impressão (`--sets`) | anulável, FIRST, FOLLOW |
-| 4. LL(1) | `ll1.c` | formatação das mensagens | as três condições LL(1) |
-| 5. Geração | `codegen.c` | estrutura do `.c`/`.h`, nomes dos tokens, conjuntos constantes, primitivas, léxico (exceto as regex), `main` | `gen_expr` (sequência, alternativa, `[ ]`, `{ }`), `gen_casamento_regex`, `gen_token_de_arquivo` |
-| Micro C | `microc_mapa.c`, `microc/scanner.c` | tabela literal → `TokenType`, adaptador do scanner | `microc_carregar_tokens_h`; ajustes ao seu TP1 |
-
-Módulos de apoio prontos: `util.c` (alocação e diagnósticos), `bitset.c` (conjuntos de terminais), `gramatica.c` (estrutura da gramática, impressão em EBNF) e `main.c` (ordem das etapas).
-
-Comece por `gramatica.h`, que descreve a árvore `Expr` usada em todas as etapas.
+O parser gerado continua sendo ANSI C e não depende de Python ou Manim. A
+animação é uma extensão opcional que consome a saída textual de `--tree`.
 
 ## Integração com o scanner do TP1 (seção 3.1 do enunciado)
 
@@ -118,6 +104,134 @@ A gramática `testes/gramaticas/microc.ebnf` é a do Apêndice B do livro-texto,
 
 ## Testes
 
-`testes/executar.sh` compara a saída do gerador (`testes/esperado/*.gerador`) e a dos analisadores gerados (`testes/programas/<gramatica>/*.esperado`) com as saídas esperadas. Cada caso termina com a linha `status <código de saída>`. Acrescente seus próprios casos: o enunciado pede pelo menos 5 gramáticas e 3 programas aceitos e 3 rejeitados por gramática válida.
+`testes/executar.sh` compara a saída do gerador
+(`testes/esperado/*.gerador`) e a dos analisadores gerados
+(`testes/programas/<gramatica>/*.esperado`) com as saídas esperadas. Cada
+caso termina com a linha `status <código de saída>`.
+
+Execute os testes oficiais pelo Makefile:
+
+```sh
+make test
+```
+
+Para validar especificamente os quatro extras, use:
+
+```powershell
+python -m unittest testes\test_extras.py -v
+```
+
+Ou, em Linux/WSL:
+
+```sh
+python3 -m unittest testes/test_extras.py -v
+```
+
+Ao adicionar casos próprios, mantenha a convenção dos arquivos esperados e
+inclua pelo menos uma entrada aceita e uma rejeitada para cada gramática
+válida. O enunciado do trabalho recomenda pelo menos 5 gramáticas e 3
+programas aceitos e 3 rejeitados por gramática.
 
 Os programas de Micro C só rodam depois de `make microc`. O caso `rejeitado_lexico.mc` espera a mensagem "String nao terminada" do seu TP1.
+
+## Extensão opcional: animação da árvore
+
+A pasta `tp2-gerador-ebnf/animacao/` contém uma extensão didática em Python que
+reutiliza a saída de `--tree` e usa Manim Community para animar a criação de
+cada nó. Ela exporta um GIF da construção e um PNG da árvore final.
+
+O parser principal continua independente de Python. Para instalar a dependência
+opcional e executar um exemplo, a partir de `tp2-gerador-ebnf/`:
+
+```powershell
+python -m pip install manim
+python animacao\arvore_manim.py --parser build\expr.exe --entrada testes\programas\expr\aceito_1.txt --saida build\animacao\expr
+```
+
+No macOS, use `python3`, barras normais e o analisador sem `.exe`:
+
+```sh
+python3 -m pip install manim
+python3 animacao/arvore_manim.py \
+  --parser build/expr \
+  --entrada testes/programas/expr/aceito_1.txt \
+  --saida build/animacao/expr
+```
+
+O analisador precisa ter sido gerado com `--tree` e compilado previamente. As
+instruções completas, incluindo o comando direto `manim ... ArvoreDerivacao`,
+estão em `tp2-gerador-ebnf/animacao/README.md`. Ao terminar, a CLI mostra o
+diretório absoluto e os caminhos do GIF, do PNG e da árvore textual. Para abrir
+esse diretório no Finder, use `open build/animacao/expr`.
+
+## Pontuação extra
+
+Os quatro recursos abaixo são opcionais e não alteram o comportamento padrão
+quando suas opções não são usadas.
+
+| Recurso | Opção no gerador | Opção na execução | Resultado |
+| --- | --- | --- | --- |
+| Recuperação após erros | `--recover` | `--recover` | relata vários erros e continua até o fim |
+| Árvore sintática abstrata | `--ast` | `--ast` | imprime a AST dos símbolos relevantes |
+| Correção de conflitos simples | `--auto-conflicts` | não se aplica | fatora alternativas com o mesmo primeiro símbolo |
+| EBNF descrita em EBNF | `ebnf.ebnf` | depende do parser gerado | valida a gramática da própria notação |
+
+O fluxo geral é gerar o analisador com a opção correspondente, compilá-lo com
+GCC e, quando indicado na tabela, repetir a opção ao executar o analisador.
+
+### Continuar a análise após erros (+1,0)
+
+Gere o analisador com `--recover`:
+
+```powershell
+.\gerador testes\gramaticas\expr.ebnf -o build\expr_recover --recover
+gcc -ansi -pedantic -Wall -Wextra -o build\expr_recover.exe build\expr_recover.c
+.\build\expr_recover.exe --recover entrada_com_erros.txt
+```
+
+O analisador usa recuperação por descarte de tokens, relata cada erro
+encontrado e termina com código diferente de zero. Erros léxicos do scanner
+próprio também são descartados para que a análise prossiga.
+
+### Árvore sintática abstrata (AST, +1,0)
+
+Gere com `--ast` e execute com `--ast`:
+
+```powershell
+.\gerador testes\gramaticas\expr.ebnf -o build\expr_ast --ast
+gcc -ansi -pedantic -Wall -Wextra -o build\expr_ast.exe build\expr_ast.c
+.\build\expr_ast.exe --ast testes\programas\expr\aceito_1.txt
+```
+
+A AST mantém os não terminais relevantes e os terminais nomeados com seus
+lexemas. Literais de pontuação e agrupamentos da EBNF são omitidos, evitando
+que símbolos auxiliares dominem a árvore.
+
+### Correção automática de conflitos simples (+0,5)
+
+`--auto-conflicts` aplica fatoração à esquerda quando alternativas compartilham
+diretamente o mesmo primeiro terminal ou não terminal:
+
+```powershell
+.\gerador testes\gramaticas\conflito_ll1.ebnf -o build\conflito --auto-conflicts
+```
+
+Conflitos ambíguos que não têm essa forma continuam sendo rejeitados. Sem a
+opção, a gramática de exemplo continua produzindo o diagnóstico LL(1)
+original.
+
+### EBNF descrita em EBNF (+0,5)
+
+`testes\gramaticas\ebnf.ebnf` descreve formalmente a própria linguagem de
+gramáticas aceita pelo gerador, incluindo `TOKENS`/`EXTERN`, `RULES`, regras,
+alternativas, sequências, opcionais e repetições. Ela pode ser processada
+normalmente pelo próprio gerador:
+
+```powershell
+.\gerador testes\gramaticas\ebnf.ebnf -o build\ebnf --ast --recover
+```
+
+Nesse exemplo, a própria gramática é lida pelo gerador e o parser resultante
+pode ser compilado e executado como qualquer outro analisador. O uso de
+`--ast` e `--recover` também exercita os dois recursos correspondentes no
+mesmo fluxo.

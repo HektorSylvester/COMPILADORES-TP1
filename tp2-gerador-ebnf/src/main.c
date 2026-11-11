@@ -2,6 +2,7 @@
  * main.c - Ponto de entrada do gerador de analisadores sintaticos.
  *
  *   gerador gramatica.ebnf -o parser [--scanner microc] [--sets] [--tree]
+ *            [--ast] [--recover] [--auto-conflicts]
  *
  * Executa as cinco etapas do enunciado, nesta ordem, parando na primeira
  * que encontrar erros:
@@ -17,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include "codegen.h"
 #include "conjuntos.h"
 #include "ebnf_parser.h"
@@ -28,24 +30,35 @@
 
 static void uso(const char *prog)
 {
-    fprintf(stderr,
-            "uso: %s gramatica.ebnf -o prefixo [--scanner microc] [--sets] [--tree] "
-            "[--debug]\n"
-            "  -o prefixo         gera prefixo.h e prefixo.c\n"
-            "  --scanner microc   usa o scanner do TP1 (TOKENS EXTERN \"tokens.h\")\n"
-            "  --sets             imprime anulavel, FIRST e FOLLOW\n"
-            "  --tree             o analisador gerado aceita --tree (arvore de derivacao)\n"
-            "  --debug            imprime a gramatica lida\n",
+    fprintf(stderr, "uso: %s gramatica.ebnf -o prefixo [--scanner microc] "
+            "[--sets] [--tree] [--ast] [--recover] [--auto-conflicts] [--debug]\n",
             prog);
+    fputs("  -o prefixo         gera prefixo.h e prefixo.c\n"
+          "  --scanner microc   usa o scanner do TP1 (TOKENS EXTERN \"tokens.h\")\n"
+          "  --sets             imprime anulavel, FIRST e FOLLOW\n"
+          "  --tree             o analisador gerado aceita --tree (arvore de derivacao)\n"
+          "  --ast              o analisador gerado aceita --ast (arvore sintatica abstrata)\n",
+          stderr);
+    fputs("  --recover          o analisador gerado aceita --recover (continua apos erros)\n"
+          "  --auto-conflicts   fatora conflitos simples antes da verificacao LL(1)\n"
+          "  --debug            imprime a gramatica lida\n", stderr);
 }
 
 /* Caminho de TOKENS EXTERN relativo ao diretorio do arquivo .ebnf. */
 static void resolver_tokens_externos(Gramatica *g, const char *arquivo)
 {
     const char *barra = strrchr(arquivo, '/');
+    const char *barra_invertida = strrchr(arquivo, '\\');
     char *novo;
     size_t n;
-    if (g->tokens_externos == NULL || g->tokens_externos[0] == '/' || barra == NULL)
+    if (barra_invertida != NULL && (barra == NULL || barra_invertida > barra))
+        barra = barra_invertida;
+    if (g->tokens_externos == NULL
+        || g->tokens_externos[0] == '/'
+        || g->tokens_externos[0] == '\\'
+        || (isalpha((unsigned char) g->tokens_externos[0])
+            && g->tokens_externos[1] == ':')
+        || barra == NULL)
         return;
     n = (size_t) (barra - arquivo) + 1;
     novo = (char *) xmalloc(n + strlen(g->tokens_externos) + 1);
@@ -58,7 +71,8 @@ static void resolver_tokens_externos(Gramatica *g, const char *arquivo)
 int main(int argc, char **argv)
 {
     const char *arquivo = NULL, *prefixo = NULL;
-    int i, microc = 0, sets = 0, arvore = 0, debug = 0, status = EXIT_FAILURE;
+    int i, microc = 0, sets = 0, arvore = 0, ast = 0, recuperacao = 0;
+    int auto_conflitos = 0, debug = 0, status = EXIT_FAILURE;
     char *fonte;
     Gramatica *g;
     OpcoesGeracao op;
@@ -76,6 +90,12 @@ int main(int argc, char **argv)
             sets = 1;
         } else if (strcmp(argv[i], "--tree") == 0) {
             arvore = 1;
+        } else if (strcmp(argv[i], "--ast") == 0) {
+            ast = 1;
+        } else if (strcmp(argv[i], "--recover") == 0) {
+            recuperacao = 1;
+        } else if (strcmp(argv[i], "--auto-conflicts") == 0) {
+            auto_conflitos = 1;
         } else if (strcmp(argv[i], "--debug") == 0) {
             debug = 1;
         } else if (argv[i][0] == '-') {
@@ -117,6 +137,9 @@ int main(int argc, char **argv)
     if (verif_basica(g, microc) > 0)
         goto fim;
 
+    if (auto_conflitos)
+        ll1_corrigir_conflitos_simples(g);
+
     /* 3. conjuntos (+ recursao a esquerda, que depende de anulavel) */
     conj_iniciar(g);
     conj_anulavel(g);
@@ -139,6 +162,8 @@ int main(int argc, char **argv)
     if (prefixo != NULL) {
         op.microc = microc;
         op.arvore = arvore;
+        op.ast = ast;
+        op.recuperacao = recuperacao;
         op.prefixo = prefixo;
         op.origem = arquivo;
         if (codegen_gerar(g, &op) != 0)

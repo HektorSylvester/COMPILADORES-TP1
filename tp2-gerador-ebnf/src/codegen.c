@@ -308,7 +308,8 @@ static void gen_expr(Emissor *em, const Gramatica *g, const Expr *e)
             break;
 
         case E_TERM:
-            emit(em, "match(%s);", g->terms[e->simbolo].nome_c);
+            emit(em, "match(%s, %d);", g->terms[e->simbolo].nome_c,
+                 g->terms[e->simbolo].literal ? 0 : 1);
             break;
 
         case E_NAOTERM:
@@ -1192,7 +1193,16 @@ static void emitir_transicoes_estado(FILE *f, const EstadoAFD *est)
             }
         } else 
         {
-            if (inicio_faixa >= 32 && inicio_faixa <= 126 && fim_faixa >= 32 && fim_faixa <= 126 && inicio_faixa != '\'' && fim_faixa != '\'' && inicio_faixa != '\\' && fim_faixa != '\\') 
+            if (inicio_faixa == 0 && fim_faixa == 255)
+            {
+                fprintf(f, "1");
+            } else if (inicio_faixa == 0)
+            {
+                fprintf(f, "c <= %d", fim_faixa);
+            } else if (fim_faixa == 255)
+            {
+                fprintf(f, "c >= %d", inicio_faixa);
+            } else if (inicio_faixa >= 32 && inicio_faixa <= 126 && fim_faixa >= 32 && fim_faixa <= 126 && inicio_faixa != '\'' && fim_faixa != '\'' && inicio_faixa != '\\' && fim_faixa != '\\')
             {
                 fprintf(f, "c >= '%c' && c <= '%c'", inicio_faixa, fim_faixa);
             } else 
@@ -1420,8 +1430,25 @@ static const char *const rt_estado[] = {
     "",
     "static Token tok;                  /* token corrente (lookahead) */",
     "static int imprimir_arvore = 0;    /* opcao --tree */",
+    "static int imprimir_ast = 0;      /* opcao --ast */",
+    "static int recuperar_erros = 0;   /* opcao --recover */",
+    "static int numero_erros = 0;",
     "static int nivel_arvore = 0;",
     "static FILE *arquivo_tokens = NULL; /* opcao --tokens */",
+    "",
+    "#if SUPORTE_AST",
+    "typedef struct AstNode AstNode;",
+    "struct AstNode {",
+    "    char *rotulo;",
+    "    AstNode **filhos;",
+    "    int nfilhos;",
+    "    int capfilhos;",
+    "};",
+    "static AstNode *ast_raiz = NULL;",
+    "static AstNode **ast_pilha = NULL;",
+    "static int ast_nivel = 0;",
+    "static int ast_cap_pilha = 0;",
+    "#endif",
     "",
     "static Token token_de_arquivo(void);",
     "",
@@ -1439,10 +1466,12 @@ static const char *const rt_primitivas[] = {
     "    return 0;",
     "}",
     "",
-    "/* Reporta o erro com os tokens esperados (lista terminada em -1) e encerra. */",
+    "/* Reporta o erro e, no modo de recuperacao, descarta um token para",
+    " * permitir que o procedimento chamador continue a analise. */",
     "void erro_sintatico(const int *esperados)",
     "{",
     "    int i;",
+    "    numero_erros++;",
     "    escrever_posicao();",
     "    if ((int) tok.tipo == TOKEN_FIM)",
     "        fprintf(stderr, \"encontrado fim de arquivo, \");",
@@ -1456,7 +1485,10 @@ static const char *const rt_primitivas[] = {
     "            fprintf(stderr, \"%s%s\", i > 0 ? \", \" : \"\", nome_token(esperados[i]));",
     "        fprintf(stderr, \"}\\n\");",
     "    }",
-    "    exit(EXIT_FAILURE);",
+    "    if (!recuperar_erros)",
+    "        exit(EXIT_FAILURE);",
+    "    if ((int) tok.tipo != TOKEN_FIM)",
+    "        avancar();",
     "}",
     "",
     "static void recuo(void)",
@@ -1480,14 +1512,138 @@ static const char *const rt_primitivas[] = {
     "    nivel_arvore--;",
     "}",
     "",
-    "/* Consome o token corrente se for do tipo esperado; senao, erro. */",
-    "void match(int esperado)",
+    "#if SUPORTE_AST",
+    "static char *ast_copiar_texto(const char *texto)",
+    "{",
+    "    size_t n = strlen(texto);",
+    "    char *copia = (char *) malloc(n + 1);",
+    "    if (copia == NULL) {",
+    "        fprintf(stderr, \"memoria insuficiente\\n\");",
+    "        exit(EXIT_FAILURE);",
+    "    }",
+    "    memcpy(copia, texto, n + 1);",
+    "    return copia;",
+    "}",
+    "",
+    "static AstNode *ast_criar(const char *rotulo)",
+    "{",
+    "    AstNode *no = (AstNode *) calloc(1, sizeof(AstNode));",
+    "    if (no == NULL) {",
+    "        fprintf(stderr, \"memoria insuficiente\\n\");",
+    "        exit(EXIT_FAILURE);",
+    "    }",
+    "    no->rotulo = ast_copiar_texto(rotulo);",
+    "    return no;",
+    "}",
+    "",
+    "static void ast_adicionar(AstNode *pai, AstNode *filho)",
+    "{",
+    "    AstNode **novos;",
+    "    if (pai->nfilhos == pai->capfilhos) {",
+    "        pai->capfilhos = pai->capfilhos ? 2 * pai->capfilhos : 4;",
+    "        novos = (AstNode **) realloc(pai->filhos,",
+    "                                     (size_t) pai->capfilhos * sizeof(AstNode *));",
+    "        if (novos == NULL) {",
+    "            fprintf(stderr, \"memoria insuficiente\\n\");",
+    "            exit(EXIT_FAILURE);",
+    "        }",
+    "        pai->filhos = novos;",
+    "    }",
+    "    pai->filhos[pai->nfilhos++] = filho;",
+    "}",
+    "",
+    "static void ast_entra(const char *nao_terminal)",
+    "{",
+    "    AstNode *no;",
+    "    AstNode **novos;",
+    "    no = ast_criar(nao_terminal);",
+    "    if (ast_nivel == 0)",
+    "        ast_raiz = no;",
+    "    else",
+    "        ast_adicionar(ast_pilha[ast_nivel - 1], no);",
+    "    if (ast_nivel == ast_cap_pilha) {",
+    "        ast_cap_pilha = ast_cap_pilha ? 2 * ast_cap_pilha : 16;",
+    "        novos = (AstNode **) realloc(ast_pilha,",
+    "                                     (size_t) ast_cap_pilha * sizeof(AstNode *));",
+    "        if (novos == NULL) {",
+    "            fprintf(stderr, \"memoria insuficiente\\n\");",
+    "            exit(EXIT_FAILURE);",
+    "        }",
+    "        ast_pilha = novos;",
+    "    }",
+    "    ast_pilha[ast_nivel++] = no;",
+    "}",
+    "",
+    "static void ast_sai(void)",
+    "{",
+    "    if (ast_nivel > 0)",
+    "        ast_nivel--;",
+    "}",
+    "",
+    "static void ast_token(const char *nome, const char *lexema)",
+    "{",
+    "    char *rotulo;",
+    "    size_t tamanho;",
+    "    AstNode *no;",
+    "    if (ast_nivel == 0)",
+    "        return;",
+    "    tamanho = strlen(nome) + strlen(lexema) + 4;",
+    "    rotulo = (char *) malloc(tamanho);",
+    "    if (rotulo == NULL) {",
+    "        fprintf(stderr, \"memoria insuficiente\\n\");",
+    "        exit(EXIT_FAILURE);",
+    "    }",
+    "    if (lexema[0] != '\\0')",
+    "        sprintf(rotulo, \"%s '%s'\", nome, lexema);",
+    "    else",
+    "        sprintf(rotulo, \"%s\", nome);",
+    "    no = ast_criar(rotulo);",
+    "    free(rotulo);",
+    "    ast_adicionar(ast_pilha[ast_nivel - 1], no);",
+    "}",
+    "",
+    "static void ast_imprimir_rec(const AstNode *no, int nivel)",
+    "{",
+    "    int i;",
+    "    for (i = 0; i < nivel; i++)",
+    "        fputs(\"  \", stdout);",
+    "    printf(\"%s\\n\", no->rotulo);",
+    "    for (i = 0; i < no->nfilhos; i++)",
+    "        ast_imprimir_rec(no->filhos[i], nivel + 1);",
+    "}",
+    "",
+    "static void ast_imprimir(void)",
+    "{",
+    "    if (ast_raiz != NULL)",
+    "        ast_imprimir_rec(ast_raiz, 0);",
+    "}",
+    "",
+    "static void ast_liberar(AstNode *no)",
+    "{",
+    "    int i;",
+    "    if (no == NULL)",
+    "        return;",
+    "    for (i = 0; i < no->nfilhos; i++)",
+    "        ast_liberar(no->filhos[i]);",
+    "    free(no->filhos);",
+    "    free(no->rotulo);",
+    "    free(no);",
+    "}",
+    "#endif",
+    "",
+    "/* Consome o token corrente se for do tipo esperado; senao, recupera. */",
+    "void match(int esperado, int incluir_ast)",
     "{",
     "    int lista[2];",
+    "#if !SUPORTE_AST",
+    "    (void) incluir_ast;",
+    "#endif",
     "    if ((int) tok.tipo != esperado) {",
     "        lista[0] = esperado;",
     "        lista[1] = -1;",
     "        erro_sintatico(lista);",
+    "        if ((int) tok.tipo != esperado)",
+    "            return;",
     "    }",
     "    if (SUPORTE_ARVORE && imprimir_arvore) {",
     "        recuo();",
@@ -1496,6 +1652,10 @@ static const char *const rt_primitivas[] = {
     "        else",
     "            printf(\"%s '%s'\\n\", nome_token(tok.tipo), tok.lexema);",
     "    }",
+    "#if SUPORTE_AST",
+    "    if (imprimir_ast && incluir_ast)",
+    "        ast_token(nome_token(tok.tipo), tok.lexema);",
+    "#endif",
     "    avancar();",
     "}",
     "",
@@ -1593,7 +1753,7 @@ static int gerar_h(const Gramatica *g, const OpcoesGeracao *op)
     fputs("const char *nome_token(int tipo);\n", f);
     fputs("int  pertence(int tipo, const int *conjunto);\n", f);
     fputs("void avancar(void);\n", f);
-    fputs("void match(int esperado);\n", f);
+    fputs("void match(int esperado, int incluir_ast);\n", f);
     fputs("void erro_sintatico(const int *esperados);\n", f);
     fputs("void arvore_entra(const char *nao_terminal);\n", f);
     fputs("void arvore_sai(void);\n\n", f);
@@ -1637,7 +1797,12 @@ static void gerar_posicao_e_avancar(FILE *f, int microc)
         fputs("        tok = proximo_token();\n", f);
         fputs("    if (tok.tipo == UNDEF) {\n", f);
         fputs("        fprintf(stderr, \"linha %d: erro lexico: %s\\n\", tok.linha, tok.lexema);\n", f);
-        fputs("        exit(EXIT_FAILURE);\n    }\n", f);
+        fputs("        numero_erros++;\n", f);
+        fputs("        if (!recuperar_erros)\n", f);
+        fputs("            exit(EXIT_FAILURE);\n", f);
+        fputs("        do {\n", f);
+        fputs("            tok = proximo_token();\n", f);
+        fputs("        } while (tok.tipo == UNDEF);\n    }\n", f);
     } else {
         fputs("        tok = proximo_token_gerado();\n", f);
     }
@@ -1712,7 +1877,11 @@ static int gerar_lexico(FILE *f, const Gramatica *g)
     fputs("    if (melhor == 0) {\n", f);
     fputs("        fprintf(stderr, \"linha %d, coluna %d: erro lexico: caractere "
           "invalido '%c'\\n\",\n                linha, coluna, fonte[pos]);\n", f);
-    fputs("        exit(EXIT_FAILURE);\n    }\n", f);
+    fputs("        numero_erros++;\n", f);
+    fputs("        if (!recuperar_erros)\n", f);
+    fputs("            exit(EXIT_FAILURE);\n", f);
+    fputs("        consumir(1);\n", f);
+    fputs("        return proximo_token_gerado();\n    }\n", f);
     fputs("    n = melhor < sizeof t.lexema ? melhor : sizeof t.lexema - 1;\n", f);
     fputs("    memcpy(t.lexema, fonte + pos, n);\n    t.lexema[n] = '\\0';\n", f);
     fputs("    t.tipo = tipo;\n    consumir(melhor);\n    return t;\n}\n\n", f);
@@ -1752,9 +1921,13 @@ static void gerar_procedimentos(FILE *f, const Gramatica *g, const OpcoesGeracao
         em.nivel = 1;
         if (op->arvore)
             emit(&em, "arvore_entra(\"%s\");", g->nts[i].nome);
+        if (op->ast)
+            emit(&em, "ast_entra(\"%s\");", g->nts[i].nome);
         gen_expr(&em, g, g->nts[i].regra);
         if (op->arvore)
             emit(&em, "arvore_sai();");
+        if (op->ast)
+            emit(&em, "ast_sai();");
         fputs("}\n\n", f);
     }
 }
@@ -1768,16 +1941,27 @@ static void gerar_main(FILE *f, const Gramatica *g, const OpcoesGeracao *op)
     fputs("    for (i = 1; i < argc; i++) {\n", f);
     fputs("        if (strcmp(argv[i], \"--tree\") == 0) {\n", f);
     fputs("            imprimir_arvore = 1;\n", f);
+    fputs("        } else if (strcmp(argv[i], \"--ast\") == 0) {\n", f);
+    fputs("            imprimir_ast = 1;\n", f);
+    fputs("        } else if (strcmp(argv[i], \"--recover\") == 0) {\n", f);
+    fputs("            recuperar_erros = 1;\n", f);
     fputs("        } else if (strcmp(argv[i], \"--tokens\") == 0 && i + 1 < argc) {\n", f);
     fputs("            tokens = argv[++i];\n", f);
     fputs("        } else if (argv[i][0] == '-' && argv[i][1] != '\\0') {\n", f);
-    fputs("            fprintf(stderr, \"uso: %s [--tree] [--tokens arquivo.tok | "
-          "programa]\\n\", argv[0]);\n", f);
+    fputs("            fprintf(stderr, \"uso: %s [--tree] [--ast] [--recover] "
+          "[--tokens arquivo.tok | programa]\\n\", argv[0]);\n", f);
     fputs("            return 2;\n        } else {\n            arquivo = argv[i];\n"
           "        }\n    }\n", f);
     fputs("    if (imprimir_arvore && !SUPORTE_ARVORE)\n", f);
     fputs("        fprintf(stderr, \"aviso: gere o analisador com --tree para "
           "imprimir a arvore\\n\");\n\n", f);
+    fputs("    if (imprimir_ast && !SUPORTE_AST)\n", f);
+    fputs("        fprintf(stderr, \"aviso: gere o analisador com --ast para "
+          "imprimir a AST\\n\");\n\n", f);
+    fputs("    if (recuperar_erros && !SUPORTE_RECUPERACAO) {\n", f);
+    fputs("        fprintf(stderr, \"aviso: gere o analisador com --recover para "
+          "continuar apos erros\\n\");\n", f);
+    fputs("        recuperar_erros = 0;\n    }\n\n", f);
     fputs("    if (tokens != NULL) {\n", f);
     fputs("        arquivo_tokens = fopen(tokens, \"r\");\n", f);
     fputs("        if (arquivo_tokens == NULL) {\n", f);
@@ -1795,8 +1979,19 @@ static void gerar_main(FILE *f, const Gramatica *g, const OpcoesGeracao *op)
     fprintf(f, "    parse_%s();\n", g->nts[g->inicial].nome);
     fputs("    if (tok.tipo != TOKEN_FIM) {\n", f);
     fputs("        fim[0] = TOKEN_FIM;\n        fim[1] = -1;\n", f);
-    fputs("        erro_sintatico(fim);\n    }\n", f);
-    fputs("    printf(\"entrada aceita\\n\");\n\n", f);
+    fputs("        while (tok.tipo != TOKEN_FIM)\n", f);
+    fputs("            erro_sintatico(fim);\n    }\n", f);
+    fputs("    if (numero_erros != 0)\n", f);
+    fputs("        printf(\"analise concluida com %d erro(s)\\n\", numero_erros);\n", f);
+    fputs("    else {\n", f);
+    fputs("        printf(\"entrada aceita\\n\");\n", f);
+    fputs("#if SUPORTE_AST\n", f);
+    fputs("        if (imprimir_ast && SUPORTE_AST) {\n", f);
+    fputs("            printf(\"AST:\\n\");\n", f);
+    fputs("            ast_imprimir();\n", f);
+    fputs("        }\n", f);
+    fputs("#endif\n", f);
+    fputs("    }\n\n", f);
     fputs("    if (arquivo_tokens != NULL) {\n        fclose(arquivo_tokens);\n", f);
     fputs("    } else {\n", f);
     if (op->microc)
@@ -1804,12 +1999,19 @@ static void gerar_main(FILE *f, const Gramatica *g, const OpcoesGeracao *op)
     else
         fputs("        free(fonte);\n", f);
     fputs("        if (entrada != stdin)\n            fclose(entrada);\n    }\n", f);
-    fputs("    return 0;\n}\n", f);
+    fputs("#if SUPORTE_AST\n", f);
+    fputs("    ast_liberar(ast_raiz);\n", f);
+    fputs("    free(ast_pilha);\n", f);
+    fputs("#endif\n", f);
+    fputs("    return numero_erros == 0 ? 0 : EXIT_FAILURE;\n}\n", f);
 }
 
 static const char *nome_base(const char *caminho)
 {
     const char *b = strrchr(caminho, '/');
+    const char *b_invertida = strrchr(caminho, '\\');
+    if (b_invertida != NULL && (b == NULL || b_invertida > b))
+        b = b_invertida;
     return b != NULL ? b + 1 : caminho;
 }
 
@@ -1841,6 +2043,8 @@ static int gerar_c(const Gramatica *g, const OpcoesGeracao *op)
     fputs("#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n", f);
     fprintf(f, "#include \"%s.h\"\n\n", nome_base(op->prefixo));
     fprintf(f, "#define SUPORTE_ARVORE %d\n\n", op->arvore ? 1 : 0);
+    fprintf(f, "#define SUPORTE_AST %d\n\n", op->ast ? 1 : 0);
+    fprintf(f, "#define SUPORTE_RECUPERACAO %d\n\n", op->recuperacao ? 1 : 0);
 
     fputs("/* ---- conjuntos de tokens ---- */\n\n", f);
     emitir_conjuntos(f, g);
