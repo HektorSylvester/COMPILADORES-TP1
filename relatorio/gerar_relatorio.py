@@ -86,12 +86,12 @@ styles.add(ParagraphStyle(
 ))
 styles.add(ParagraphStyle(
     name="ReportBody", parent=styles["BodyText"], fontName="ReportRegular",
-    fontSize=10.5, leading=17, textColor=INK, alignment=TA_JUSTIFY,
-    spaceAfter=9,
+    fontSize=10, leading=15.2, textColor=INK, alignment=TA_JUSTIFY,
+    spaceAfter=7,
 ))
 styles.add(ParagraphStyle(
     name="ReportBullet", parent=styles["ReportBody"], leftIndent=15,
-    firstLineIndent=-10, bulletIndent=5, spaceAfter=6,
+    firstLineIndent=-10, bulletIndent=5, spaceAfter=4,
 ))
 styles.add(ParagraphStyle(
     name="ReportCode", parent=styles["Code"], fontName="ReportRegular",
@@ -243,7 +243,6 @@ def build_report() -> None:
     ]
 
     story += [
-        PageBreak(),
         paragraph("3. Recursos de pontuação extra", "ReportHeading1"),
         paragraph(
             "Os quatro recursos extras são opcionais e não alteram o comportamento padrão quando suas opções não são utilizadas. Essa característica preserva a compatibilidade com o fluxo original de geração e reconhecimento. A tabela a seguir relaciona a ativação de cada recurso e seu resultado principal."
@@ -327,16 +326,16 @@ def build_report() -> None:
         table(
             ["Conjunto de validação", "Resultado observado"],
             [
-                ["Testes oficiais do gerador", "18/18 aprovados na validação anterior."],
-                ["Programas Micro C", "6/6 aprovados na validação anterior em WSL."],
-                ["Testes dos recursos extras", "4/4 aprovados na versão atual."],
-                ["Testes da animação", "12/12 aprovados na versão atual."],
-                ["Renderização real", "GIF, PNG e TXT produzidos e verificados."],
+                ["Gramáticas", "5: expr, calc e microc válidas; conflito_ll1 e recursao_esquerda com erros."],
+                ["Casos das gramáticas válidas", "Expr: 3 aceitos/4 rejeitados; calc: 3/3; Micro C: 3/3."],
+                ["Suíte oficial", "18/18 testes não-Micro C aprovados; 6/6 casos Micro C aprovados."],
+                ["Recursos extras", "4/4 testes aprovados: AST, recuperação, fatoração e auto-EBNF."],
+                ["Animação", "12/12 testes aprovados; GIF, PNG e TXT renderizados."],
             ],
             [8.2 * cm, 8.4 * cm],
         ),
         paragraph(
-            "Os testes dos extras cobrem a impressão da AST sem pontuação literal desnecessária, o acúmulo de múltiplos erros com --recover, a fatoração automática das alternativas conflitantes do exemplo e o reconhecimento de uma gramática pelo analisador produzido a partir da EBNF auto-descrita."
+            "A matriz atende ao requisito mínimo do enunciado: cinco gramáticas, sendo três válidas — expr, calc e Micro C — e duas destinadas a erros — conflito_ll1 e recursao_esquerda. Para cada gramática válida há pelo menos três entradas aceitas e três rejeitadas. Os testes dos extras cobrem a impressão da AST sem pontuação literal desnecessária, o acúmulo de múltiplos erros com --recover, a fatoração automática e o reconhecimento da EBNF auto-descrita."
         ),
         paragraph(
             "A suíte da animação verifica a reconstrução da hierarquia, a ordem dos nós, lexemas com espaços, a leitura da saída UTF-16 do Windows PowerShell, a rejeição de formatos inválidos, a proporção 16:9 e a apresentação dos caminhos absolutos. O teste de integração compila o gerador e um analisador real para confirmar a aceitação da entrada e a exportação da árvore."
@@ -346,11 +345,17 @@ def build_report() -> None:
             "No Linux e macOS, o equivalente utiliza python3 e barras normais. O teste de integração pode selecionar o compilador definido por CC. Na última validação local, o Manim Community 0.22.1 estava instalado e uma execução com um parser temporário gerado com --tree confirmou a criação dos três artefatos. O diretório temporário foi removido após a conferência."
         ),
         paragraph(
-            "Não houve execução nativa em um computador macOS nesse ambiente de desenvolvimento. A compatibilidade foi estruturada, documentada e verificada pelos testes disponíveis no Windows, com caminhos POSIX na implementação e Clang selecionável pelo Makefile. A verificação final em macOS requer as dependências nativas do Manim na máquina de destino."
+            "A compatibilidade foi estruturada e verificada no Windows, com caminhos POSIX na implementação e Clang selecionável pelo Makefile. A execução nativa do Manim no macOS ainda depende das bibliotecas instaladas na máquina de destino."
         ),
-        paragraph("6. Organização do repositório", "ReportHeading1"),
+        paragraph("6. Conformidade com os requisitos e entrega", "ReportHeading1"),
         paragraph(
-            "O desenvolvimento da animação, da documentação e dos recursos extras foi publicado na branch tp2-manim, preservando a branch principal. O commit a04e4d8 reúne o suporte multiplataforma, a seleção do compilador nos testes, a documentação macOS e a exibição explícita dos caminhos dos artefatos da animação."
+            "O projeto atende ao requisito de linguagem com código do gerador e código gerado em ANSI C, compilados com -ansi -pedantic -Wall -Wextra. A leitura da EBNF e a geração do analisador são implementadas nos fontes do grupo; o Flex permanece restrito ao scanner do TP1. O código gerado conserva a regra de origem em comentário, e as rotinas de destruição liberam as estruturas alocadas ao final."
+        ),
+        paragraph(
+            "Os entregáveis previstos estão no repositório: código-fonte, scanner adaptado, testes, README, USO_IA.md e este relatório. Para a apresentação, o fluxo recomendado é criar ao vivo uma gramática nova, por exemplo uma lista de identificadores separada por vírgulas, gerar o parser com --tree, compilar com GCC ou Clang e processar uma entrada aceita e uma rejeitada, explicando os diagnósticos e a árvore produzida."
+        ),
+        paragraph(
+            "O desenvolvimento da animação, da documentação e dos recursos extras foi publicado na branch tp2-manim, preservando a branch principal. A branch reúne o suporte multiplataforma, a seleção do compilador nos testes e a exibição explícita dos caminhos dos artefatos da animação."
         ),
         paragraph("Hiperlinks do projeto", "ReportHeading2"),
         link("Repositório na branch tp2-manim", REPOSITORY),
@@ -366,14 +371,7 @@ def build_report() -> None:
         link("Registro de uso de IA", "https://github.com/HektorSylvester/COMPILADORES-TP1/blob/tp2-manim/USO_IA.md"),
         paragraph("7. Considerações finais", "ReportHeading1"),
         paragraph(
-            "O trabalho apresenta um gerador funcional de analisadores descendentes recursivos e o complementa com recursos voltados a diagnóstico, representação abstrata, tratamento de conflitos e compreensão visual da análise sintática. As extensões são acionáveis quando necessárias, sem impor uma dependência ao funcionamento básico do gerador."
-        ),
-        paragraph(
-            "A animação com Manim acrescenta uma dimensão didática ao resultado: em vez de apenas informar se uma entrada foi aceita, permite acompanhar a criação dos nós da derivação. Por fim, a documentação multiplataforma e a apresentação explícita do diretório de saída reduzem a dificuldade de reproduzir o trabalho e localizar seus resultados."
-        ),
-        rich(
-            'O uso de ferramentas de IA durante o desenvolvimento está registrado em <link href="https://github.com/HektorSylvester/COMPILADORES-TP1/blob/tp2-manim/USO_IA.md" color="#7B1E3A"><u>USO_IA.md</u></link>.',
-            "ReportBody",
+            "O trabalho entrega um gerador funcional e extensível, com diagnóstico, AST, tratamento de conflitos e visualização da análise. A animação com Manim acompanha a criação dos nós; a documentação e os hiperlinks tornam a reprodução e a localização dos artefatos diretas. O uso de IA está registrado no link USO_IA.md acima.",
         ),
     ]
 
